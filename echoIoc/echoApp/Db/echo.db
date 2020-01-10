@@ -1,0 +1,10 @@
+record(stringout, "$(P):Write"){
+    field(DTYP, "stream")
+    field(OUT,  "@echo.proto write $(PORT) $(A)")
+}
+
+record(stringin, "$(P):Read"){
+    field(DTYP, "stream")
+    field(INP,  "@echo.proto read $(PORT) $(A)")
+}
+
