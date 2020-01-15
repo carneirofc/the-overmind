@@ -7,7 +7,7 @@ cd "${TOP}"
 dbLoadDatabase "dbd/echo.dbd"
 echo_registerRecordDeviceDriver pdbbase
 
-drvAsynIPPortConfigure("P0","unix://socket")
+drvAsynIPPortConfigure("P0","unix:///tmp/socket")
 
 dbLoadRecords("db/echo.db","user=carneirofc,PORT=P0,A=0,P=echo")
 

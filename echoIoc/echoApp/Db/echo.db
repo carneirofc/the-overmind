@@ -8,3 +8,9 @@ record(stringin, "$(P):Read"){
     field(INP,  "@echo.proto read $(PORT) $(A)")
 }
 
+record(stringin, "$(P):Query"){
+    field(DTYP, "stream")
+    field(INP,  "@echo.proto query $(PORT) $(A)")
+    field(SCAN, "1 second")
+}
+

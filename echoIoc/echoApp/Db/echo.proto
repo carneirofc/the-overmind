@@ -5,3 +5,10 @@ write {
 read {
     in  "%s";
 }
+
+Terminator = LF;
+
+query {
+    out "ASD";
+    in  "%s";
+}
