@@ -9,6 +9,6 @@ read {
 Terminator = LF;
 
 query {
-    out "ASD";
+    out "\$1";
     in  "%s";
 }

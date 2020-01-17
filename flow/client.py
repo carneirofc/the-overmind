@@ -2,17 +2,13 @@
 import argparse
 import configparser
 import logging
-import redis
 import time
 import common
 
 from random import random
 
-# self.redis_upstream self.redis_upstream_listen data
-to_upstream_command2 = """
-return redis.call('exists', 'KEYS[1]') == 0 """
 to_upstream_command = """
-if redis.call('exists', 'KEYS[1]') == 0 then 
+if redis.call('exists', KEYS[2]) == 1 and redis.call('exists', KEYS[1]) == 0 then 
   redis.call('set', KEYS[1], KEYS[3])
   redis.call('del', KEYS[2])
   return 1
@@ -50,15 +46,19 @@ class BaseClient:
         downstream_data = message['data']
         logger.debug('{}: {}'.format(self.redis_downstream, downstream_data))
 
+        num = random()
+
         outputstream_data = None
         if downstream_data == b'1':
-            outputstream_data = '{}_{}_1\n'.format(self.client_id, random()).encode('utf-8')
+            outputstream_data = '{}_{}_1\n'.format(self.client_id, num).encode('utf-8')
         elif downstream_data == b'2':
             pass
         elif downstream_data == b'3':
-            outputstream_data = '{}_{}_3\n'.format(self.client_id, random()).encode('utf-8')
+            outputstream_data = '{}_{}_3\n'.format(self.client_id, num).encode('utf-8')
         else:
             outputstream_data= '{}_NACK\n'.format(self.client_id)
+
+        time.sleep(num)
 
         if outputstream_data:
             logger.info('{}: {} action_status={}'.format(

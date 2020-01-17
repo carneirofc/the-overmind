@@ -10,6 +10,7 @@ import time
 
 logger = logging.getLogger()
 
+
 # LOCK_ON = '1'
 # LOCK_OFF = '2'
 #
@@ -17,7 +18,7 @@ logger = logging.getLogger()
 class MakeBelive:
 
     def __init__(self, socket_path, stream_name: str, redis_manager: common.RedisManager,
-                 redis_upstream_timeout: int=1, socket_reconnect_interval: int = 30,
+                 redis_upstream_timeout: int = 1, socket_reconnect_interval: int = 30,
                  socket_terminator: bytes = b'\n',
                  socket_buffer: int = 1, socket_timeout: int = 5, socket_use_terminator: bool = True,
                  socket_read_payload_length: bool = False, **kwargs):
@@ -52,7 +53,7 @@ class MakeBelive:
             self.redis_upstream_timeout = redis_upstream_timeout
 
         self.redis_conn = redis_manager.connection
-        # self.redis_pubsub = self.redis_conn.pubsub()
+        self.redis_pubsub = self.redis_conn.pubsub()
         self.redis_pipe = self.redis_conn.pipeline()
 
     def __str__(self):
@@ -60,12 +61,11 @@ class MakeBelive:
                'downstream {}'.format(self.socket_path, self.socket_reconnect_interval, self.socket_buffer,
                                       self.socket_terminator, self.redis_downstream, self.redis_upstream)
 
-    @staticmethod
-    def upstream_handler(conn: socket.socket, data):
+    def upstream_handler(self, conn: socket.socket, data):
         if data is None:
             data = b'TOUT\n'
 
-        logger.debug('From upstream: {}'.format(data))
+        logger.debug('{}: {}'.format(self.redis_upstream, data))
         if type(data) != bytes:
             data = data.encode('utf-8')
         conn.sendall(data)
@@ -95,8 +95,6 @@ class MakeBelive:
                 logger.debug('Socket read operation terminated via timeout, data {}.'.format(data))
         return data
 
-
-
     def start(self):
         if os.path.exists(self.socket_path):
             os.remove(self.socket_path)
@@ -114,7 +112,6 @@ class MakeBelive:
                 try:
                     with conn:
                         logger.info('Connected to the unix socket {} {} {}'.format(self.socket_path, conn, addr))
-                        # self.redis_pubsub.subscribe(self.redis_upstream)
                         while True:
                             data = self.read_from_socket(conn)
 
@@ -131,27 +128,16 @@ class MakeBelive:
                                 redis_pipe.expire(self.redis_upstream_listen, self.redis_upstream_timeout)
                                 redis_pipe.execute()
                             logger.debug('{}: {}'.format(self.redis_downstream, data))
-                            # self.redis_pubsub.subscribe(self.redis_upstream)
-                            # logger.debug('Sub {}'.format(self.redis_upstream))
-
-                            # self.redis_pubsub.get_message(ignore_subscribe_messages=True,
-                            #                               timeout=self.redis_upstream_timeout)
 
                             while self.redis_conn.exists(self.redis_upstream_listen):
                                 time.sleep(0.01)
 
-                            # self.redis_pubsub.unsubscribe(self.redis_upstream)
-                            # logger.debug('USub {}'.format(self.redis_upstream))
-                            # self.redis_pipe.multi()
                             upstream_response = self.redis_conn.get(self.redis_upstream)
-                            # self.redis_pipe.set(self.redis_upstream_listen, LOCK_ON)
-                            # upstream_response = self.redis_pipe.execute()[0]  # First response
 
                             self.upstream_handler(conn, upstream_response)
 
                 except:
                     logger.exception('The connection with the unix socket {} has been closed.'.format(self.socket_path))
-                    # self.redis_pubsub.unsubscribe(self.redis_upstream)
 
 
 if __name__ == '__main__':

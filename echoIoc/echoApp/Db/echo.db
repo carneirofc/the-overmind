@@ -8,9 +8,24 @@ record(stringin, "$(P):Read"){
     field(INP,  "@echo.proto read $(PORT) $(A)")
 }
 
-record(stringin, "$(P):Query"){
+record(stringin, "$(P):Query1"){
     field(DTYP, "stream")
-    field(INP,  "@echo.proto query $(PORT) $(A)")
+    field(INP,  "@echo.proto query(1) $(PORT) $(A)")
+    field(SCAN, "1 second")
+}
+record(stringin, "$(P):Query2"){
+    field(DTYP, "stream")
+    field(INP,  "@echo.proto query(2) $(PORT) $(A)")
+    field(SCAN, "1 second")
+}
+record(stringin, "$(P):Query3"){
+    field(DTYP, "stream")
+    field(INP,  "@echo.proto query(3) $(PORT) $(A)")
+    field(SCAN, "1 second")
+}
+record(stringin, "$(P):Query4"){
+    field(DTYP, "stream")
+    field(INP,  "@echo.proto query(4) $(PORT) $(A)")
     field(SCAN, "1 second")
 }
 
