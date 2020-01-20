@@ -13,7 +13,6 @@ logger = logging.getLogger()
 
 # LOCK_ON = '1'
 # LOCK_OFF = '2'
-#
 
 class MakeBelive:
 
@@ -42,13 +41,14 @@ class MakeBelive:
         self.socket_timeout = socket_timeout
         self.socket_use_terminator = socket_use_terminator
         self.socket_read_payload_length = socket_read_payload_length
-        self.redis_downstream = stream_name + '#down'
-        self.redis_upstream = stream_name + '#up'
+
+        self.redis_downstream_data = stream_name + '#down#data'
+        self.redis_upstream_data = stream_name + '#up#data'
         self.redis_upstream_listen = stream_name + '#up#listen'
 
         if redis_upstream_timeout <= 0:
             logger.error('Redis upstream timeout must be greater than zero. Using default value of 5.')
-            self.redis_upstream_timeout = 5
+            self.redis_upstream_timeout = 5.
         else:
             self.redis_upstream_timeout = redis_upstream_timeout
 
@@ -65,7 +65,7 @@ class MakeBelive:
         if data is None:
             data = b'TOUT\n'
 
-        logger.debug('{}: {}'.format(self.redis_upstream, data))
+        logger.debug('{}: {}'.format(self.redis_upstream_data, data))
         if type(data) != bytes:
             data = data.encode('utf-8')
         conn.sendall(data)
@@ -120,20 +120,30 @@ class MakeBelive:
                                 break
 
                             # Send stuff to redis
+                            upstream_listen_code = time.time()
                             with self.redis_conn.pipeline() as redis_pipe:
                                 redis_pipe.multi()
-                                redis_pipe.delete(self.redis_upstream)
-                                redis_pipe.publish(self.redis_downstream, data)
-                                redis_pipe.set(self.redis_upstream_listen, '1')
-                                redis_pipe.expire(self.redis_upstream_listen, self.redis_upstream_timeout)
+                                redis_pipe.delete(self.redis_upstream_data) # Remove old repose
+                                redis_pipe.set(self.redis_upstream_listen, upstream_listen_code) # Update listen code
+                                redis_pipe.publish(self.redis_upstream_listen, upstream_listen_code) # Publish listen code
+                                # redis_pipe.expire(self.redis_upstream_listen, self.redis_upstream_timeout) # Listen tout
+                                redis_pipe.set(self.redis_downstream_data, data) # Set downstream data
                                 redis_pipe.execute()
-                            logger.debug('{}: {}'.format(self.redis_downstream, data))
+                            logger.debug('{}: {}\t{}: {}'.format(self.redis_downstream_data, data,
+                                                                 self.redis_upstream_listen, upstream_listen_code))
 
-                            while self.redis_conn.exists(self.redis_upstream_listen):
-                                time.sleep(0.01)
+                            while not self.redis_conn.exists(self.redis_upstream_data) and\
+                                    (time.time() - upstream_listen_code) < self.redis_upstream_timeout:
+                                time.sleep(0.001)
 
-                            upstream_response = self.redis_conn.get(self.redis_upstream)
+                            with self.redis_pipe:
+                                redis_pipe.multi()
+                                redis_pipe.delete(self.redis_upstream_listen)
+                                redis_pipe.get(self.redis_upstream_data)
+                                vals = redis_pipe.execute()
 
+                            # upstream_response = self.redis_conn.get(self.redis_upstream_data)
+                            upstream_response = vals[1] # Upstream data
                             self.upstream_handler(conn, upstream_response)
 
                 except:

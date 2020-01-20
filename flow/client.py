@@ -3,7 +3,9 @@ import argparse
 import configparser
 import logging
 import time
+import asyncio
 import common
+from threading import RLock
 
 from random import random
 
@@ -20,31 +22,59 @@ logger = logging.getLogger()
 
 
 class BaseClient:
-    def __init__(self, redis_manager: common.RedisManager, stream_name: str, client_id:str, **kwargs):
+    def __init__(self, redis_manager: common.RedisManager, stream_name: str, client_id: str, **kwargs):
         self.client_id = client_id
         self.redis_manager = redis_manager
         self.redis_conn = redis_manager.connection
-        self.redis_downstream = stream_name + '#down'
-        self.redis_upstream = stream_name + '#up'
+
+        self.redis_downstream_data = stream_name + '#down#data'
+        self.redis_upstream_data = stream_name + '#up#data'
         self.redis_upstream_listen = stream_name + '#up#listen'
+
+        self.message_lock = RLock()
+        self.message_id = None
+
+    def update_message_id(self, message_id):
+        with self.message_lock:
+            self.message_id = message_id
+
+    def check_message(self, message_id):
+        with self.message_lock:
+            eq = self.message_id == message_id
+        return eq
 
     def start(self):
         p = self.redis_conn.pubsub()
 
-        p.subscribe(**{self.redis_downstream: self.downstream_handler})
+        # p.subscribe(**{self.redis_upstream_listen: self.downstream_handler})
+        p.subscribe(self.redis_upstream_listen)
         logger.info('Initializing the subscribe event loop.')
 
         while True:
             # Event Loop ?!
+            # self.downstream_handler(p.get_message(ignore_subscribe_messages=True))
             self.downstream_handler(p.get_message(ignore_subscribe_messages=True))
             time.sleep(0.001)
 
-    def downstream_handler(self, message):
-        if not message:
+    def downstream_handler(self, message_id):
+        if not message_id:
+            # No data from downstream !
             return
 
-        downstream_data = message['data']
-        logger.debug('{}: {}'.format(self.redis_downstream, downstream_data))
+        self.message_id = message_id['data']
+        downstream_data = self.redis_conn.eval('''
+            if redis.call('get',  KEYS[1]) == KEYS[3] then
+                return redis.call('get', KEYS[2])
+            end
+            
+            return nil
+            ''', 3, self.redis_upstream_listen, self.redis_downstream_data, self.message_id)
+
+        if not downstream_data:
+            logger.info('Timeout {}: {}'.format(self.redis_upstream_listen, message_id))
+            return
+
+        logger.debug('{}: {}'.format(self.redis_downstream_data, downstream_data))
 
         num = random()
 
@@ -56,18 +86,39 @@ class BaseClient:
         elif downstream_data == b'3':
             outputstream_data = '{}_{}_3\n'.format(self.client_id, num).encode('utf-8')
         else:
-            outputstream_data= '{}_NACK\n'.format(self.client_id)
+            outputstream_data = '{}_NACK\n'.format(self.client_id)
 
         time.sleep(num)
 
         if outputstream_data:
-            logger.info('{}: {} action_status={}'.format(
-                self.redis_upstream, outputstream_data, self.redis_conn.eval(
-                    to_upstream_command,
-                    3,
-                    self.redis_upstream,
-                    self.redis_upstream_listen,
-                    outputstream_data)))
+            res = self.redis_conn.eval(
+                '''
+                -- KEYS[1] self.redis_upstream_data
+                -- KEYS[2] outputstream_data
+                -- KEYS[3] self.redis_upstream_listen
+                -- KEYS[4] message_id
+                
+                valid_id = redis.call('get', KEYS[3]) == KEYS[4]
+                
+                if not valid_id then
+                   return -1
+                end
+                
+                if redis.call('exists', KEYS[1]) == 1 then
+                    return -2
+                end
+                
+               redis.call('set', KEYS[1], KEYS[2])
+                ''', 4, self.redis_upstream_data, outputstream_data, self.redis_upstream_listen, message_id)
+
+            logger.info('{}: {} action_status={}'.format(self.redis_upstream_data, outputstream_data, res))
+            # logger.info('{}: {} action_status={}'.format(
+            #     self.redis_upstream_data, outputstream_data, self.redis_conn.eval(
+            #         to_upstream_command,
+            #         3,
+            #         self.redis_upstream_data,
+            #         self.redis_upstream_listen,
+            #         outputstream_data)))
 
 
 if __name__ == '__main__':
