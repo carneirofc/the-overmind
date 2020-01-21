@@ -46,22 +46,20 @@ class BaseClient:
     def start(self):
         p = self.redis_conn.pubsub()
 
-        # p.subscribe(**{self.redis_upstream_listen: self.downstream_handler})
         p.subscribe(self.redis_upstream_listen)
         logger.info('Initializing the subscribe event loop.')
 
         while True:
             # Event Loop ?!
-            # self.downstream_handler(p.get_message(ignore_subscribe_messages=True))
             self.downstream_handler(p.get_message(ignore_subscribe_messages=True))
             time.sleep(0.001)
 
-    def downstream_handler(self, message_id):
-        if not message_id:
+    def downstream_handler(self, _message_id):
+        if not _message_id:
             # No data from downstream !
             return
 
-        self.message_id = message_id['data']
+        self.message_id = _message_id['data']
         downstream_data = self.redis_conn.eval('''
             if redis.call('get',  KEYS[1]) == KEYS[3] then
                 return redis.call('get', KEYS[2])
@@ -71,34 +69,34 @@ class BaseClient:
             ''', 3, self.redis_upstream_listen, self.redis_downstream_data, self.message_id)
 
         if not downstream_data:
-            logger.info('Timeout {}: {}'.format(self.redis_upstream_listen, message_id))
+            logger.info('Timeout {}: {}'.format(self.redis_upstream_listen, self.message_id))
             return
 
         logger.debug('{}: {}'.format(self.redis_downstream_data, downstream_data))
 
         num = random()
 
-        outputstream_data = None
+        os_data = None
         if downstream_data == b'1':
-            outputstream_data = '{}_{}_1\n'.format(self.client_id, num).encode('utf-8')
+            os_data = '{}_{}_1\n'.format(self.client_id, num).encode('utf-8')
         elif downstream_data == b'2':
             pass
         elif downstream_data == b'3':
-            outputstream_data = '{}_{}_3\n'.format(self.client_id, num).encode('utf-8')
+            os_data = '{}_{}_3\n'.format(self.client_id, num).encode('utf-8')
         else:
-            outputstream_data = '{}_NACK\n'.format(self.client_id)
+            os_data = '{}_NACK\n'.format(self.client_id)
 
         time.sleep(num)
 
-        if outputstream_data:
+        if os_data:
             res = self.redis_conn.eval(
                 '''
                 -- KEYS[1] self.redis_upstream_data
-                -- KEYS[2] outputstream_data
+                -- KEYS[2] os_data
                 -- KEYS[3] self.redis_upstream_listen
                 -- KEYS[4] message_id
                 
-                valid_id = redis.call('get', KEYS[3]) == KEYS[4]
+                local valid_id = redis.call('get', KEYS[3]) == KEYS[4]
                 
                 if not valid_id then
                    return -1
@@ -109,16 +107,10 @@ class BaseClient:
                 end
                 
                redis.call('set', KEYS[1], KEYS[2])
-                ''', 4, self.redis_upstream_data, outputstream_data, self.redis_upstream_listen, message_id)
+               return 1
+                ''', 4, self.redis_upstream_data, os_data, self.redis_upstream_listen, self.message_id)
 
-            logger.info('{}: {} action_status={}'.format(self.redis_upstream_data, outputstream_data, res))
-            # logger.info('{}: {} action_status={}'.format(
-            #     self.redis_upstream_data, outputstream_data, self.redis_conn.eval(
-            #         to_upstream_command,
-            #         3,
-            #         self.redis_upstream_data,
-            #         self.redis_upstream_listen,
-            #         outputstream_data)))
+            logger.info('{}: {} action_status={}'.format(self.redis_upstream_data, os_data, res))
 
 
 if __name__ == '__main__':

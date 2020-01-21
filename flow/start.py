@@ -57,9 +57,15 @@ class MakeBelive:
         self.redis_pipe = self.redis_conn.pipeline()
 
     def __str__(self):
-        return 'The Overmind sees! Socket {}, reconnect interval {}, buffer {}, terminator {}. Redis upstream {}, ' \
-               'downstream {}'.format(self.socket_path, self.socket_reconnect_interval, self.socket_buffer,
-                                      self.socket_terminator, self.redis_downstream, self.redis_upstream)
+        return 'The Overmind sees! Socket {}, reconnect interval {}, buffer {}, terminator {}. Redis downstream {}, ' \
+               'upstream {}, upstream_listen {}, upstream_timeout {}'.format(self.socket_path,
+                                                                             self.socket_reconnect_interval,
+                                                                             self.socket_buffer,
+                                                                             self.socket_terminator,
+                                                                             self.redis_downstream_data,
+                                                                             self.redis_upstream_data,
+                                                                             self.redis_upstream_listen,
+                                                                             self.redis_upstream_timeout)
 
     def upstream_handler(self, conn: socket.socket, data):
         if data is None:
@@ -96,6 +102,7 @@ class MakeBelive:
         return data
 
     def start(self):
+        logger.info(self.__str__())
         if os.path.exists(self.socket_path):
             os.remove(self.socket_path)
 
