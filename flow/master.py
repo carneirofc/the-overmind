@@ -11,15 +11,45 @@ import time
 logger = logging.getLogger()
 
 
-# LOCK_ON = '1'
-# LOCK_OFF = '2'
+class BaseMaster:
 
-class MakeBelive:
+    def __init__(self, redis_manager: common.RedisManager):
+        self.redis_manager = redis_manager
 
-    def __init__(self, socket_path, stream_name: str, redis_manager: common.RedisManager,
-                 redis_upstream_timeout: int = 1, socket_reconnect_interval: int = 30,
+    def get_from_device(self, *args, **kwargs):
+        logger.warning("Override method {} from {}".format(self.get_from_device.__name__, self.__str__()))
+        return b'1'
+
+    def send_to_device(self, *args, **kwargs):
+        logger.warning("Override method {} from {}".format(self.send_to_device.__name__, self.__str__()))
+        return b''
+
+    def start(self):
+        while True:
+            data = self.get_from_device()
+
+            self.redis_manager.master_downstream_handler(data)
+
+            self.redis_manager.master_pool_data()
+
+            upstream_response = self.redis_manager.master_upstream_handler()
+
+            self.send_to_device(upstream_response)
+
+
+class DGRAMSocketMaster:
+
+    def __init__(self,
+                 socket_path,
+                 stream_name: str,
+                 redis_manager: common.RedisManager,
+                 redis_upstream_timeout: int = 1,
+
+                 socket_reconnect_interval: int = 30,
                  socket_terminator: bytes = b'\n',
-                 socket_buffer: int = 1, socket_timeout: int = 5, socket_use_terminator: bool = True,
+                 socket_buffer: int = 1,
+                 socket_timeout: int = 5,
+                 socket_use_terminator: bool = True,
                  socket_read_payload_length: bool = False, **kwargs):
         """
 
@@ -130,27 +160,28 @@ class MakeBelive:
                             upstream_listen_code = time.time()
                             with self.redis_conn.pipeline() as redis_pipe:
                                 redis_pipe.multi()
-                                redis_pipe.delete(self.redis_upstream_data) # Remove old repose
-                                redis_pipe.set(self.redis_upstream_listen, upstream_listen_code) # Update listen code
-                                redis_pipe.publish(self.redis_upstream_listen, upstream_listen_code) # Publish listen code
-                                # redis_pipe.expire(self.redis_upstream_listen, self.redis_upstream_timeout) # Listen tout
-                                redis_pipe.set(self.redis_downstream_data, data) # Set downstream data
+                                redis_pipe.delete(self.redis_upstream_data)  # Remove old repose
+                                redis_pipe.set(self.redis_upstream_listen, upstream_listen_code)  # Update listen code
+                                redis_pipe.set(self.redis_downstream_data, data)  # Set downstream data
+                                redis_pipe.publish(self.redis_upstream_listen,
+                                                   upstream_listen_code)  # Publish listen code
                                 redis_pipe.execute()
                             logger.debug('{}: {}\t{}: {}'.format(self.redis_downstream_data, data,
                                                                  self.redis_upstream_listen, upstream_listen_code))
 
-                            while not self.redis_conn.exists(self.redis_upstream_data) and\
+                            while not self.redis_conn.exists(self.redis_upstream_data) and \
                                     (time.time() - upstream_listen_code) < self.redis_upstream_timeout:
                                 time.sleep(0.001)
 
                             with self.redis_pipe:
                                 redis_pipe.multi()
+                                redis_pipe.delete(self.redis_downstream_data)
                                 redis_pipe.delete(self.redis_upstream_listen)
                                 redis_pipe.get(self.redis_upstream_data)
                                 vals = redis_pipe.execute()
 
                             # upstream_response = self.redis_conn.get(self.redis_upstream_data)
-                            upstream_response = vals[1] # Upstream data
+                            upstream_response = vals[2]  # Upstream data
                             self.upstream_handler(conn, upstream_response)
 
                 except:
@@ -177,11 +208,16 @@ if __name__ == '__main__':
 
     redis_cfg = cfg_parser['redis']
     common.RedisManager.init_pool(
-        redis_ip=redis_cfg.get('redis_ip'),
-        redis_port=redis_cfg.getint('redis_port'),
-        redis_db=redis_cfg.getint('redis_db'))
+        ip=redis_cfg.get('ip'),
+        port=redis_cfg.getint('port'),
+        db=redis_cfg.getint('db'))
 
-    redis_manager = common.RedisManager()
+    redis_manager = common.RedisManager(
+        stream_name=args.stream_name if args.stream_name else cfg_parser['DEFAULT']['stream_name'],
+        upstream_timeout=redis_cfg.getint('upstream_timeout')
+    )
 
-    blivin = MakeBelive(redis_manager=redis_manager, **params)
+    blivin = BaseMaster(redis_manager=redis_manager)
     blivin.start()
+    #blivin = DGRAMSocketMaster(redis_manager=redis_manager, **params)
+    #blivin.start()
