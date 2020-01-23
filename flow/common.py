@@ -29,7 +29,12 @@ class RedisManager:
         self._tick = tick
 
         self._upstream_listen_code = None
-        self._upstream_timeout = upstream_timeout
+
+        if upstream_timeout <= 0:
+            logger.error('Redis upstream timeout must be greater than zero. Using default value of 2.')
+            self._upstream_timeout = 2
+        else:
+            self._upstream_timeout = upstream_timeout
 
     @staticmethod
     def init_pool(ip: str = 'localhost', port: int = 6379, db: int = 0):

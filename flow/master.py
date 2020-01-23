@@ -6,7 +6,6 @@ import socket
 import configparser
 import argparse
 import common
-import time
 
 logger = logging.getLogger()
 
@@ -18,7 +17,7 @@ class BaseMaster:
 
     def get_from_device(self, *args, **kwargs):
         logger.warning("Override method {} from {}".format(self.get_from_device.__name__, self.__str__()))
-        return b'1'
+        return b''
 
     def send_to_device(self, *args, **kwargs):
         logger.warning("Override method {} from {}".format(self.send_to_device.__name__, self.__str__()))
@@ -37,26 +36,18 @@ class BaseMaster:
             self.send_to_device(upstream_response)
 
 
-class DGRAMSocketMaster:
+class DGRAMSocketMaster(BaseMaster):
 
-    def __init__(self,
-                 socket_path,
-                 stream_name: str,
-                 redis_manager: common.RedisManager,
-                 redis_upstream_timeout: int = 1,
-
+    def __init__(self, socket_path, redis_manager: common.RedisManager,
                  socket_reconnect_interval: int = 30,
                  socket_terminator: bytes = b'\n',
                  socket_buffer: int = 1,
                  socket_timeout: int = 5,
                  socket_use_terminator: bool = True,
-                 socket_read_payload_length: bool = False, **kwargs):
+                 socket_read_payload_length: bool = False):
         """
 
         :param socket_path:
-        :param stream_name:
-        :param redis_conn:
-        :param redis_upstream_timeout:
         :param socket_reconnect_interval:
         :param socket_terminator:
         :param socket_buffer:
@@ -64,6 +55,7 @@ class DGRAMSocketMaster:
         :param socket_use_terminator:
         :param socket_read_payload_length: If enabled, the first 4 bytes are the remaining payload length.
         """
+        super().__init__(redis_manager)
         self.socket_path = socket_path
         self.socket_buffer = socket_buffer
         self.socket_terminator = socket_terminator
@@ -72,54 +64,29 @@ class DGRAMSocketMaster:
         self.socket_use_terminator = socket_use_terminator
         self.socket_read_payload_length = socket_read_payload_length
 
-        self.redis_downstream_data = stream_name + '#down#data'
-        self.redis_upstream_data = stream_name + '#up#data'
-        self.redis_upstream_listen = stream_name + '#up#listen'
+    def send_to_device(self, upstream_response):
+        if upstream_response is None:
+            upstream_response = b'TOUT\n'
 
-        if redis_upstream_timeout <= 0:
-            logger.error('Redis upstream timeout must be greater than zero. Using default value of 5.')
-            self.redis_upstream_timeout = 5.
-        else:
-            self.redis_upstream_timeout = redis_upstream_timeout
+        if type(upstream_response) != bytes:
+            data = upstream_response.encode('utf-8')
+        logger.debug('To device: {}'.format(upstream_response))
+        self.conn.sendall(upstream_response)
 
-        self.redis_conn = redis_manager.connection
-        self.redis_pubsub = self.redis_conn.pubsub()
-        self.redis_pipe = self.redis_conn.pipeline()
-
-    def __str__(self):
-        return 'The Overmind sees! Socket {}, reconnect interval {}, buffer {}, terminator {}. Redis downstream {}, ' \
-               'upstream {}, upstream_listen {}, upstream_timeout {}'.format(self.socket_path,
-                                                                             self.socket_reconnect_interval,
-                                                                             self.socket_buffer,
-                                                                             self.socket_terminator,
-                                                                             self.redis_downstream_data,
-                                                                             self.redis_upstream_data,
-                                                                             self.redis_upstream_listen,
-                                                                             self.redis_upstream_timeout)
-
-    def upstream_handler(self, conn: socket.socket, data):
-        if data is None:
-            data = b'TOUT\n'
-
-        logger.debug('{}: {}'.format(self.redis_upstream_data, data))
-        if type(data) != bytes:
-            data = data.encode('utf-8')
-        conn.sendall(data)
-
-    def read_from_socket(self, conn: socket.socket):
+    def get_from_device(self, *args, **kwargs):
         data = b''
         socket_continue_recv = True
         while socket_continue_recv:
             try:
                 if self.socket_read_payload_length:
-                    payload_length = int(conn.recv(4))
-                    b = conn.recv(payload_length)
+                    payload_length = int(self.conn.recv(4))
+                    b = self.conn.recv(payload_length)
                     if b == b'':
                         break
                     data = b
                     socket_continue_recv = False
                 else:
-                    b = conn.recv(self.socket_buffer)
+                    b = self.conn.recv(self.socket_buffer)
                     if b == b'':
                         break
                     data += b
@@ -143,47 +110,13 @@ class DGRAMSocketMaster:
             logger.info('Unix Socket {}: Waiting for a connection'.format(self.socket_path))
 
             while True:
-                conn, addr = s.accept()
-                conn.setblocking(True)
-                conn.settimeout(self.socket_timeout)
+                self.conn, addr = s.accept()
+                self.conn.setblocking(True)
+                self.conn.settimeout(self.socket_timeout)
                 try:
-                    with conn:
-                        logger.info('Connected to the unix socket {} {} {}'.format(self.socket_path, conn, addr))
-                        while True:
-                            data = self.read_from_socket(conn)
-
-                            if not data or data == b'':
-                                logger.info('No data received from the unix socket {}'.format(self.socket_path))
-                                break
-
-                            # Send stuff to redis
-                            upstream_listen_code = time.time()
-                            with self.redis_conn.pipeline() as redis_pipe:
-                                redis_pipe.multi()
-                                redis_pipe.delete(self.redis_upstream_data)  # Remove old repose
-                                redis_pipe.set(self.redis_upstream_listen, upstream_listen_code)  # Update listen code
-                                redis_pipe.set(self.redis_downstream_data, data)  # Set downstream data
-                                redis_pipe.publish(self.redis_upstream_listen,
-                                                   upstream_listen_code)  # Publish listen code
-                                redis_pipe.execute()
-                            logger.debug('{}: {}\t{}: {}'.format(self.redis_downstream_data, data,
-                                                                 self.redis_upstream_listen, upstream_listen_code))
-
-                            while not self.redis_conn.exists(self.redis_upstream_data) and \
-                                    (time.time() - upstream_listen_code) < self.redis_upstream_timeout:
-                                time.sleep(0.001)
-
-                            with self.redis_pipe:
-                                redis_pipe.multi()
-                                redis_pipe.delete(self.redis_downstream_data)
-                                redis_pipe.delete(self.redis_upstream_listen)
-                                redis_pipe.get(self.redis_upstream_data)
-                                vals = redis_pipe.execute()
-
-                            # upstream_response = self.redis_conn.get(self.redis_upstream_data)
-                            upstream_response = vals[2]  # Upstream data
-                            self.upstream_handler(conn, upstream_response)
-
+                    with self.conn:
+                        logger.info('Connected to the unix socket {} {} {}'.format(self.socket_path, self.conn, addr))
+                        super().start()
                 except:
                     logger.exception('The connection with the unix socket {} has been closed.'.format(self.socket_path))
 
@@ -217,7 +150,5 @@ if __name__ == '__main__':
         upstream_timeout=redis_cfg.getint('upstream_timeout')
     )
 
-    blivin = BaseMaster(redis_manager=redis_manager)
+    blivin = DGRAMSocketMaster(redis_manager=redis_manager, **params)
     blivin.start()
-    #blivin = DGRAMSocketMaster(redis_manager=redis_manager, **params)
-    #blivin.start()

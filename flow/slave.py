@@ -23,7 +23,7 @@ class BaseSlave:
     def do_something(self, downstream_data):
         logger.warning("Override method {} from {}".format(self.do_something.__name__, self.__str__()))
 
-        return self.client_id_encoded + b"#" + downstream_data
+        return self.client_id_encoded + b"#" + downstream_data + b'\n'
 
 
 if __name__ == '__main__':
