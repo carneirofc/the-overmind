@@ -2,7 +2,7 @@
 import argparse
 import configparser
 import logging
-import common
+import zerg.common
 
 logger = logging.getLogger()
 
@@ -11,7 +11,7 @@ class BaseSlave:
     """
     Base slave object for synchronous communication.
     """
-    def __init__(self, redis_manager: common.RedisManager, client_id: str):
+    def __init__(self, redis_manager: zerg.common.RedisManager, client_id: str):
         self.client_id = client_id
         self.client_id_encoded = self.client_id.encode('utf-8')
 
@@ -27,34 +27,34 @@ class BaseSlave:
 
 
 if __name__ == '__main__':
-    cfg_parser = configparser.ConfigParser()
-    with open('config.ini') as _f:
-        cfg_parser.read_file(_f)
 
     parser = argparse.ArgumentParser("Client side - Pipeline connection")
     parser.add_argument('--stream-name', type=str)
-    parser.add_argument('--client-id', type=str)
+    parser.add_argument('--client-id', type=str, default='cli_1')
+    parser.add_argument('--config-ini', type=str, default='config.ini')
 
-    common.log_config()
+    zerg.common.log_config()
 
     args = parser.parse_args()
-    if not args.client_id:
-        client_id = 'cli_1'
-    else:
-        client_id = args.client_id
+
+    cfg_parser = configparser.ConfigParser()
+    cfg_ini_path = zerg.get_abs_path(args.config_ini)
+    logger.info('Loading config from {}'.format(cfg_ini_path))
+    with open(cfg_ini_path) as _f:
+        cfg_parser.read_file(_f)
 
     params = {
         'stream_name': args.stream_name if args.stream_name else cfg_parser['DEFAULT']['stream_name'],
     }
 
     redis_cfg = cfg_parser['redis']
-    common.RedisManager.init_pool(
+    zerg.common.RedisManager.init_pool(
         ip=redis_cfg.get('ip'),
         port=redis_cfg.getint('port'),
         db=redis_cfg.getint('db'))
 
-    redis_manager = common.RedisManager(
+    redis_manager = zerg.common.RedisManager(
         stream_name=args.stream_name if args.stream_name else cfg_parser['DEFAULT']['stream_name'])
-    common.log_config()
+    zerg.common.log_config()
 
-    BaseSlave(redis_manager=redis_manager, client_id=client_id).start()
+    BaseSlave(redis_manager=redis_manager, client_id=args.client_id).start()

@@ -1,0 +1,12 @@
+__pycache__
+.idea
+test/echoIoc/bin/
+test/echoIoc/configure/O.linux-x86_64/
+test/echoIoc/db/
+test/echoIoc/dbd/
+test/echoIoc/echoApp/Db/O.linux-x86_64/
+test/echoIoc/echoApp/src/O.Common/
+test/echoIoc/echoApp/src/O.linux-x86_64/
+test/echoIoc/iocBoot/iocecho/envPaths
+zerg/__init__.pyc
+

@@ -16,7 +16,7 @@ logger = logging.getLogger()
 class RedisManager:
     _pool = None
 
-    def __init__(self, stream_name, tick: float = 0.001, upstream_timeout=1, reconnect_interval:float=30):
+    def __init__(self, stream_name, tick: float = 0.001, upstream_timeout=1, reconnect_interval: float = 30):
         self.connection = None
         self.connect()
 
@@ -159,4 +159,3 @@ class RedisManager:
                 ''', 4, self.upstream_data, os_data, self.upstream_listen, message_id)
 
             logger.debug('{}: {} action_status={}'.format(self.upstream_data, os_data, res))
-

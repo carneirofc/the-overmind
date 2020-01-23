@@ -1,0 +1,2 @@
+include zerg/config.ini
+include zerg/VERSION

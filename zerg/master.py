@@ -5,14 +5,16 @@ import os
 import socket
 import configparser
 import argparse
-import common
+
+import zerg.common
+import zerg
 
 logger = logging.getLogger()
 
 
 class BaseMaster:
 
-    def __init__(self, redis_manager: common.RedisManager):
+    def __init__(self, redis_manager: zerg.common.RedisManager):
         self.redis_manager = redis_manager
 
     def get_from_device(self, *args, **kwargs):
@@ -32,11 +34,11 @@ class BaseMaster:
             self.send_to_device(upstream_response)
 
 
-class DGRAMSocketMaster(BaseMaster):
-    CFG_DGRAM_SOCKET = 'DGRAM_socket'
+class STREAMSocketMaster(BaseMaster):
+    CFG_STREAM_SOCKET = 'STREAM_socket'
 
     def __init__(self, socket_path,
-                 redis_manager: common.RedisManager,
+                 redis_manager: zerg.common.RedisManager,
                  socket_reconnect_interval: int = 30,
                  socket_terminator: bytes = b'\n',
                  socket_buffer: int = 1,
@@ -121,39 +123,41 @@ class DGRAMSocketMaster(BaseMaster):
 
 
 if __name__ == '__main__':
-    cfg_parser = configparser.ConfigParser()
-    with open('config.ini') as _f:
-        cfg_parser.read_file(_f)
-
     parser = argparse.ArgumentParser("IOC side - Pipeline connection")
     parser.add_argument('--socket-path', type=str)
     parser.add_argument('--stream-name', type=str)
-
-    common.log_config()
-
+    parser.add_argument('--config-ini', type=str, default='config.ini')
     args = parser.parse_args()
+
+    cfg_parser = configparser.ConfigParser()
+    cfg_ini_path = zerg.get_abs_path(args.config_ini)
+    logger.info('Loading config from {}'.format(cfg_ini_path))
+    with open(cfg_ini_path) as _f:
+        cfg_parser.read_file(_f)
+
+    zerg.common.log_config()
 
     stream_name = args.stream_name if args.stream_name else cfg_parser['DEFAULT'].get('stream_name')
     socket_path = args.socket_path if args.socket_path else cfg_parser['DEFAULT'].get('socket_path')
 
     redis_cfg = cfg_parser['redis']
-    common.RedisManager.init_pool(
+    zerg.common.RedisManager.init_pool(
         ip=redis_cfg.get('ip'),
         port=redis_cfg.getint('port'),
         db=redis_cfg.getint('db'))
 
-    redis_manager = common.RedisManager(
+    redis_manager = zerg.common.RedisManager(
         stream_name=stream_name,
         upstream_timeout=redis_cfg.getint('upstream_timeout'))
 
-    cfg = cfg_parser[DGRAMSocketMaster.CFG_DGRAM_SOCKET]
+    cfg = cfg_parser[STREAMSocketMaster.CFG_STREAM_SOCKET]
 
-    DGRAMSocketMaster(redis_manager=redis_manager,
-                      socket_path=socket_path,
-                      socket_read_payload_length=cfg.getboolean('read_payload_length'),
-                      socket_reconnect_interval=cfg.getfloat('reconnect_interval'),
-                      socket_terminator=cfg.get('terminator') if cfg.get('terminator') != 'LF' else b'\n',
-                      socket_timeout=cfg.getfloat('timeout', 5),
-                      socket_use_terminator=cfg.getboolean('use_terminator'),
-                      socket_buffer=cfg.getint('buffer', 1)
-                      ).start()
+    STREAMSocketMaster(redis_manager=redis_manager,
+                       socket_path=socket_path,
+                       socket_read_payload_length=cfg.getboolean('read_payload_length'),
+                       socket_reconnect_interval=cfg.getfloat('reconnect_interval'),
+                       socket_terminator=cfg.get('terminator') if cfg.get('terminator') != 'LF' else b'\n',
+                       socket_timeout=cfg.getfloat('timeout', 5),
+                       socket_use_terminator=cfg.getboolean('use_terminator'),
+                       socket_buffer=cfg.getint('buffer', 1)
+                       ).start()
