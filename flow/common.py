@@ -16,7 +16,7 @@ logger = logging.getLogger()
 class RedisManager:
     _pool = None
 
-    def __init__(self, stream_name, tick: float = 0.001, upstream_timeout=1):
+    def __init__(self, stream_name, tick: float = 0.001, upstream_timeout=1, reconnect_interval:float=30):
         self.connection = None
         self.connect()
 
@@ -27,6 +27,7 @@ class RedisManager:
         self._downstream_action = None
         self._pipeline = self.connection.pipeline(transaction=True)
         self._tick = tick
+        self._reconnect_interval = reconnect_interval
 
         self._upstream_listen_code = None
 
@@ -56,6 +57,15 @@ class RedisManager:
             self.connection.close()
             logger.info('Redis connection closed.')
 
+    def master_sync_send_receive(self, data):
+        try:
+            self.master_downstream_handler(data)
+            self.master_pool_data()
+            return self.master_upstream_handler()
+        except redis.exceptions.ConnectionError:
+            logger.fatal('Redis connection lost to {}.'.format(RedisManager._pool.__str__()))
+            return None
+
     def master_pool_data(self):
         while not self.connection.exists(self.upstream_data) and \
                 (time.time() - self._upstream_listen_code) < self._upstream_timeout:
@@ -81,18 +91,23 @@ class RedisManager:
             self.upstream_listen, self._upstream_listen_code))
 
     def slave_upstream_listen(self, downstream_action: types.FunctionType):
-        self._downstream_action = downstream_action
-        p = self.connection.pubsub()
-
-        p.subscribe(self.upstream_listen)
-        logger.info('Initializing the subscribe event loop.')
-
-        message = None
         while True:
-            message = p.get_message(ignore_subscribe_messages=True)
-            if message:
-                self.slave_downstream_handler(message)
-            time.sleep(self._tick)
+            try:
+                self._downstream_action = downstream_action
+                p = self.connection.pubsub()
+
+                p.subscribe(self.upstream_listen)
+                logger.info('Initializing the subscribe event loop.')
+
+                while True:
+                    message = p.get_message(ignore_subscribe_messages=True)
+                    if message:
+                        self.slave_downstream_handler(message)
+                    time.sleep(self._tick)
+            except redis.exceptions.ConnectionError:
+                logger.fatal('Redis connection lost to {}. Retry in {} seconds.'.format(RedisManager._pool.__str__(),
+                                                                                        self._reconnect_interval))
+                time.sleep(self._reconnect_interval)
 
     def slave_downstream_handler(self, _message_id):
 
@@ -144,3 +159,4 @@ class RedisManager:
                 ''', 4, self.upstream_data, os_data, self.upstream_listen, message_id)
 
             logger.debug('{}: {} action_status={}'.format(self.upstream_data, os_data, res))
+

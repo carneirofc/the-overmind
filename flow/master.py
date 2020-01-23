@@ -27,18 +27,16 @@ class BaseMaster:
         while True:
             data = self.get_from_device()
 
-            self.redis_manager.master_downstream_handler(data)
-
-            self.redis_manager.master_pool_data()
-
-            upstream_response = self.redis_manager.master_upstream_handler()
+            upstream_response = self.redis_manager.master_sync_send_receive(data)
 
             self.send_to_device(upstream_response)
 
 
 class DGRAMSocketMaster(BaseMaster):
+    CFG_DGRAM_SOCKET = 'DGRAM_socket'
 
-    def __init__(self, socket_path, redis_manager: common.RedisManager,
+    def __init__(self, socket_path,
+                 redis_manager: common.RedisManager,
                  socket_reconnect_interval: int = 30,
                  socket_terminator: bytes = b'\n',
                  socket_buffer: int = 1,
@@ -56,13 +54,14 @@ class DGRAMSocketMaster(BaseMaster):
         :param socket_read_payload_length: If enabled, the first 4 bytes are the remaining payload length.
         """
         super().__init__(redis_manager)
+
         self.socket_path = socket_path
         self.socket_buffer = socket_buffer
-        self.socket_terminator = socket_terminator
+        self.socket_read_payload_length = socket_read_payload_length
         self.socket_reconnect_interval = socket_reconnect_interval
+        self.socket_terminator = socket_terminator
         self.socket_timeout = socket_timeout
         self.socket_use_terminator = socket_use_terminator
-        self.socket_read_payload_length = socket_read_payload_length
 
     def send_to_device(self, upstream_response):
         if upstream_response is None:
@@ -134,10 +133,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    params = {
-        'stream_name': args.stream_name if args.stream_name else cfg_parser['DEFAULT']['stream_name'],
-        'socket_path': args.socket_path if args.socket_path else cfg_parser['DEFAULT']['socket_path'],
-    }
+    stream_name = args.stream_name if args.stream_name else cfg_parser['DEFAULT'].get('stream_name')
+    socket_path = args.socket_path if args.socket_path else cfg_parser['DEFAULT'].get('socket_path')
 
     redis_cfg = cfg_parser['redis']
     common.RedisManager.init_pool(
@@ -146,9 +143,17 @@ if __name__ == '__main__':
         db=redis_cfg.getint('db'))
 
     redis_manager = common.RedisManager(
-        stream_name=args.stream_name if args.stream_name else cfg_parser['DEFAULT']['stream_name'],
-        upstream_timeout=redis_cfg.getint('upstream_timeout')
-    )
+        stream_name=stream_name,
+        upstream_timeout=redis_cfg.getint('upstream_timeout'))
 
-    blivin = DGRAMSocketMaster(redis_manager=redis_manager, **params)
-    blivin.start()
+    cfg = cfg_parser[DGRAMSocketMaster.CFG_DGRAM_SOCKET]
+
+    DGRAMSocketMaster(redis_manager=redis_manager,
+                      socket_path=socket_path,
+                      socket_read_payload_length=cfg.getboolean('read_payload_length'),
+                      socket_reconnect_interval=cfg.getfloat('reconnect_interval'),
+                      socket_terminator=cfg.get('terminator') if cfg.get('terminator') != 'LF' else b'\n',
+                      socket_timeout=cfg.getfloat('timeout', 5),
+                      socket_use_terminator=cfg.getboolean('use_terminator'),
+                      socket_buffer=cfg.getint('buffer', 1)
+                      ).start()

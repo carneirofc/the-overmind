@@ -57,5 +57,4 @@ if __name__ == '__main__':
         stream_name=args.stream_name if args.stream_name else cfg_parser['DEFAULT']['stream_name'])
     common.log_config()
 
-    client = BaseSlave(redis_manager=redis_manager, client_id=client_id)
-    client.start()
+    BaseSlave(redis_manager=redis_manager, client_id=client_id).start()
