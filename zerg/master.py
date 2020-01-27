@@ -3,8 +3,6 @@
 import logging
 import os
 import socket
-import configparser
-import argparse
 
 import zerg.common
 import zerg
@@ -44,7 +42,8 @@ class STREAMSocketMaster(BaseMaster):
                  socket_buffer: int = 1,
                  socket_timeout: int = 5,
                  socket_use_terminator: bool = True,
-                 socket_read_payload_length: bool = False):
+                 socket_read_payload_length: bool = False,
+                 socket_trimm_terminator:bool= False):
         """
 
         :param socket_path:
@@ -63,6 +62,7 @@ class STREAMSocketMaster(BaseMaster):
         self.socket_reconnect_interval = socket_reconnect_interval
         self.socket_terminator = socket_terminator
         self.socket_timeout = socket_timeout
+        self.socket_trimm_terminator = socket_trimm_terminator
         self.socket_use_terminator = socket_use_terminator
 
     def send_to_device(self, upstream_response):
@@ -70,11 +70,12 @@ class STREAMSocketMaster(BaseMaster):
             upstream_response = b'TOUT\n'
 
         if type(upstream_response) != bytes:
-            data = upstream_response.encode('utf-8')
+            upstream_response = upstream_response.encode('utf-8')
         logger.debug('To device: {}'.format(upstream_response))
         self.conn.sendall(upstream_response)
 
     def get_from_device(self, *args, **kwargs):
+
         data = b''
         socket_continue_recv = True
         while socket_continue_recv:
@@ -92,7 +93,8 @@ class STREAMSocketMaster(BaseMaster):
                         break
                     data += b
                     if self.socket_use_terminator and data.endswith(self.socket_terminator):
-                        data = data[:-len(self.socket_terminator)]
+                        if self.socket_trimm_terminator:
+                            data = data[:-len(self.socket_terminator)]
                         socket_continue_recv = False
             except socket.timeout:
                 socket_continue_recv = False
@@ -121,43 +123,3 @@ class STREAMSocketMaster(BaseMaster):
                 except:
                     logger.exception('The connection with the unix socket {} has been closed.'.format(self.socket_path))
 
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser("IOC side - Pipeline connection")
-    parser.add_argument('--socket-path', type=str)
-    parser.add_argument('--stream-name', type=str)
-    parser.add_argument('--config-ini', type=str, default='config.ini')
-    args = parser.parse_args()
-
-    cfg_parser = configparser.ConfigParser()
-    cfg_ini_path = zerg.get_abs_path(args.config_ini)
-    logger.info('Loading config from {}'.format(cfg_ini_path))
-    with open(cfg_ini_path) as _f:
-        cfg_parser.read_file(_f)
-
-    zerg.common.log_config()
-
-    stream_name = args.stream_name if args.stream_name else cfg_parser['DEFAULT'].get('stream_name')
-    socket_path = args.socket_path if args.socket_path else cfg_parser['DEFAULT'].get('socket_path')
-
-    redis_cfg = cfg_parser['redis']
-    zerg.common.RedisManager.init_pool(
-        ip=redis_cfg.get('ip'),
-        port=redis_cfg.getint('port'),
-        db=redis_cfg.getint('db'))
-
-    redis_manager = zerg.common.RedisManager(
-        stream_name=stream_name,
-        upstream_timeout=redis_cfg.getint('upstream_timeout'))
-
-    cfg = cfg_parser[STREAMSocketMaster.CFG_STREAM_SOCKET]
-
-    STREAMSocketMaster(redis_manager=redis_manager,
-                       socket_path=socket_path,
-                       socket_read_payload_length=cfg.getboolean('read_payload_length'),
-                       socket_reconnect_interval=cfg.getfloat('reconnect_interval'),
-                       socket_terminator=cfg.get('terminator') if cfg.get('terminator') != 'LF' else b'\n',
-                       socket_timeout=cfg.getfloat('timeout', 5),
-                       socket_use_terminator=cfg.getboolean('use_terminator'),
-                       socket_buffer=cfg.getint('buffer', 1)
-                       ).start()

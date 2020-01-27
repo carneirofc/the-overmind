@@ -5,12 +5,41 @@ import time
 import types
 
 
-def log_config():
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s',
+def log_config(level: int = logging.INFO):
+    logging.basicConfig(level=level, format='%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s',
                         datefmt='%Y-%m-%d,%H:%M:%S')
 
 
 logger = logging.getLogger()
+
+
+def get_log_level(level: str):
+    if level == 'notset':
+        return 0
+    elif level == 'debug':
+        return 10
+    elif level == 'info':
+        return 20
+    elif level == 'warning':
+        return 30
+    elif level == 'error':
+        return 40
+    elif level == 'critical':
+        return 50
+    else:
+        return 10
+
+
+def get_terminator_bytes(terminator: str):
+    """
+    Encode and parse some special characters.
+    \CR\ -> \r
+    \LF\ -> \n
+    """
+    return terminator\
+        .replace('\CR\\', '\r')\
+        .replace('\LF\\', '\n')\
+        .encode('utf-8')
 
 
 class RedisManager:
