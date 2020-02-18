@@ -31,14 +31,43 @@ def get_log_level(level: str):
 
 
 def get_terminator_bytes(terminator: str):
-    """
-    Encode and parse some special characters.
-    \CR\ -> \r
-    \LF\ -> \n
-    """
-    return terminator\
-        .replace('\\CR\\', '\r')\
-        .replace('\\LF\\', '\n')\
+    """ Parse ascii symbolic to byte code. """
+    return terminator \
+        .replace('\\NULL\\', '\x00')\
+        .replace('\\SOH\\',  '\x01')\
+        .replace('\\STX\\',  '\x02')\
+        .replace('\\ETX\\',  '\x03')\
+        .replace('\\EOT\\',  '\x04')\
+        .replace('\\ENQ\\',  '\x05')\
+        .replace('\\ACK\\',  '\x06')\
+        .replace('\\BEL\\',  '\x07')\
+        .replace('\\BS\\',   '\x08')\
+        .replace('\\TAB\\',  '\x09')\
+        .replace('\\HT\\',   '\x09')\
+        .replace('\\LF\\',   '\n') \
+        .replace('\\VT\\',   '\x0B')\
+        .replace('\\FF\\',   '\x0C')\
+        .replace('\\NP\\',   '\x0C')\
+        .replace('\\CR\\',   '\r') \
+        .replace('\\SO\\',   '\x0E')\
+        .replace('\\SI\\',   '\x0F')\
+        .replace('\\DLE\\',  '\x10')\
+        .replace('\\DC1\\',  '\x11')\
+        .replace('\\DC2\\',  '\x12')\
+        .replace('\\DC3\\',  '\x13')\
+        .replace('\\DC4\\',  '\x14')\
+        .replace('\\NAK\\',  '\x15')\
+        .replace('\\SYN\\',  '\x16')\
+        .replace('\\ETB\\',  '\x17')\
+        .replace('\\CAN\\',  '\x18')\
+        .replace('\\EM\\',   '\x19')\
+        .replace('\\SUB\\',  '\x1A')\
+        .replace('\\ESC\\',  '\x1B')\
+        .replace('\\FS\\',   '\x1C')\
+        .replace('\\GS\\',   '\x1D')\
+        .replace('\\RS\\',   '\x1E')\
+        .replace('\\US\\',   '\x1F')\
+        .replace('\\DEL\\',  '\x7F')\
         .encode('utf-8')
 
 
