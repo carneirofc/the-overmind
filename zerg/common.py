@@ -45,7 +45,7 @@ def get_terminator_bytes(terminator: str):
 class RedisManager:
     _pool = None
 
-    def __init__(self, stream_name, tick: float = 0.001, upstream_timeout=1, reconnect_interval: float = 30):
+    def __init__(self, stream_name, tick: float = 0.001, upstream_timeout: float = 1, reconnect_interval: float = 30):
         self.connection = None
         self.connect()
 
@@ -60,9 +60,9 @@ class RedisManager:
 
         self._upstream_listen_code = None
 
-        if upstream_timeout <= 0:
+        if upstream_timeout <= 0.:
             logger.error('Redis upstream timeout must be greater than zero. Using default value of 2.')
-            self._upstream_timeout = 2
+            self._upstream_timeout = 2.
         else:
             self._upstream_timeout = upstream_timeout
 

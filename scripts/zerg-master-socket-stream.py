@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
     redis_manager = zerg.common.RedisManager(
         stream_name=stream_name,
-        upstream_timeout=redis_cfg.getint('upstream_timeout'))
+        upstream_timeout=redis_cfg.getfloat('upstream_timeout'))
 
     cfg = cfg_parser[zerg.master.STREAMSocketMaster.CFG_STREAM_SOCKET]
 
@@ -48,5 +48,5 @@ if __name__ == '__main__':
                                    socket_timeout=cfg.getfloat('timeout', 5),
                                    socket_use_terminator=cfg.getboolean('use_terminator'),
                                    socket_buffer=cfg.getint('buffer', 1),
-                                   # socket_trimm_terminator=cfg.get('trimm_terminator')
+                                   socket_trim_terminator=cfg.get('trim_terminator'),
                                    ).start()

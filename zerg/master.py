@@ -43,7 +43,8 @@ class STREAMSocketMaster(BaseMaster):
                  socket_timeout: int = 5,
                  socket_use_terminator: bool = True,
                  socket_read_payload_length: bool = False,
-                 socket_trimm_terminator:bool= False):
+                 socket_trim_terminator: bool = True
+                 ):
         """
 
         :param socket_path:
@@ -62,17 +63,18 @@ class STREAMSocketMaster(BaseMaster):
         self.socket_reconnect_interval = socket_reconnect_interval
         self.socket_terminator = socket_terminator
         self.socket_timeout = socket_timeout
-        self.socket_trimm_terminator = socket_trimm_terminator
+        self.socket_trim_terminator = socket_trim_terminator
         self.socket_use_terminator = socket_use_terminator
 
     def send_to_device(self, upstream_response):
         if upstream_response is None:
-            upstream_response = b'TOUT\n'
+            upstream_response = b'TOUT'
 
         if type(upstream_response) != bytes:
             upstream_response = upstream_response.encode('utf-8')
         logger.debug('To device: {}'.format(upstream_response))
-        self.conn.sendall(upstream_response)
+
+        self.conn.sendall(upstream_response + self.socket_terminator)
 
     def get_from_device(self, *args, **kwargs):
 
@@ -93,7 +95,7 @@ class STREAMSocketMaster(BaseMaster):
                         break
                     data += b
                     if self.socket_use_terminator and data.endswith(self.socket_terminator):
-                        if self.socket_trimm_terminator:
+                        if self.socket_trim_terminator:
                             data = data[:-len(self.socket_terminator)]
                         socket_continue_recv = False
             except socket.timeout:
