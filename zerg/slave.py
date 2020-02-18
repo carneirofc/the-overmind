@@ -10,7 +10,6 @@ import zerg.common
 
 logger = logging.getLogger()
 
-
 class BaseSlave:
     """
     Base slave object for synchronous communication.
@@ -35,9 +34,9 @@ class SerialSlave(BaseSlave):
                  serial_device: str,
                  serial_baudrate: int,
                  serial_buffer: int = 256,
-                 serial_operation_timeout: float = 0.5,
+                 serial_operation_timeout: float = 1.25,
                  serial_read_terminator: bytes = b'\r\n',
-                 serial_read_timeout: float = 0.01,
+                 serial_read_timeout: float = 0.5,
                  serial_write_timeout: float = 2):
 
         super().__init__(redis_manager, client_id)
@@ -48,6 +47,7 @@ class SerialSlave(BaseSlave):
         self.serial_operation_timeout = serial_operation_timeout
         self.serial_read_terminator = list(serial_read_terminator)
         self.serial_read_terminator_len = len(self.serial_read_terminator)
+        self.serial_use_terminator = False
         self.serial_read_timeout = serial_read_timeout
         self.serial_buffer = serial_buffer
         self.ser = None
@@ -73,11 +73,9 @@ class SerialSlave(BaseSlave):
         res = []
         if not self.ser:
             self.connect()
-
         try:
             self.ser.reset_input_buffer()
             self.ser.reset_output_buffer()
-
             self.ser.write(data)
 
             ser_continue = True
@@ -87,12 +85,17 @@ class SerialSlave(BaseSlave):
                 b = self.ser.read(self.serial_buffer)
                 if b == b'':
                     ser_continue = False
+                    logger.debug('Ser: Read timeout')
                 if time.time() - tini > self.serial_operation_timeout:
                     ser_continue = False
+                    logger.debug('Ser: Operation timeout')
+
                 res.append(b)
 
-                if len(res) >= len(self.serial_read_terminator):
+                if len(res) >= len(self.serial_read_terminator) and self.serial_use_terminator:
                     ser_continue = res[-self.serial_read_terminator_len:] == self.serial_read_terminator
+                    logger.debug('Ser: Terminator')
+
         except termios.error:
             logger.exception('Serial exception, closing connection.')
             self.ser.close()
