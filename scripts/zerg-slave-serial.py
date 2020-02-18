@@ -51,4 +51,5 @@ if __name__ == '__main__':
                            serial_operation_timeout=ser_cfg.getfloat('operation_timeout'),
                            serial_read_terminator=zerg.common.get_terminator_bytes(ser_cfg.get('read_terminator')),
                            serial_read_timeout=ser_cfg.getfloat('read_timeout'),
-                           serial_write_timeout=ser_cfg.getfloat('write_timeout')).start()
+                           serial_write_timeout=ser_cfg.getfloat('write_timeout'),
+                           serial_use_terminator=ser_cfg.getboolean('use_terminator')).start()
