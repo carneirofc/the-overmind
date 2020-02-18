@@ -21,9 +21,8 @@ if __name__ == '__main__':
             level=zerg.common.get_log_level(args.logging_level))
 
     cfg_parser = configparser.ConfigParser()
-    cfg_ini_path = zerg.get_abs_path(args.config_ini)
-    logger.info('Loading config from {}'.format(cfg_ini_path))
-    with open(cfg_ini_path) as _f:
+    logger.info('Loading config from {}'.format(args.config_ini))
+    with open(args.config_ini) as _f:
         cfg_parser.read_file(_f)
 
     stream_name = args.stream_name if args.stream_name else cfg_parser['DEFAULT'].get('stream_name')
@@ -49,5 +48,5 @@ if __name__ == '__main__':
                                    socket_timeout=cfg.getfloat('timeout', 5),
                                    socket_use_terminator=cfg.getboolean('use_terminator'),
                                    socket_buffer=cfg.getint('buffer', 1),
-                                   socket_trimm_terminator=cfg.get('trimm_terminator')
+                                   # socket_trimm_terminator=cfg.get('trimm_terminator')
                                    ).start()

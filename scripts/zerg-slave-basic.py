@@ -22,10 +22,9 @@ if __name__ == '__main__':
             level=zerg.common.get_log_level(args.logging_level))
 
     cfg_parser = configparser.ConfigParser()
-    cfg_ini_path = zerg.get_abs_path(args.config_ini)
-    logger.info('Loading config from {}'.format(cfg_ini_path))
+    logger.info('Loading config from {}'.format(args.config_ini))
 
-    with open(cfg_ini_path) as _f:
+    with open(args.config_ini) as _f:
         cfg_parser.read_file(_f)
 
     redis_cfg = cfg_parser['redis']
