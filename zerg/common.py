@@ -37,8 +37,8 @@ def get_terminator_bytes(terminator: str):
     \LF\ -> \n
     """
     return terminator\
-        .replace('\CR\\', '\r')\
-        .replace('\LF\\', '\n')\
+        .replace('\\CR\\', '\r')\
+        .replace('\\LF\\', '\n')\
         .encode('utf-8')
 
 
