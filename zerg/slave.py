@@ -37,8 +37,9 @@ class SerialSlave(BaseSlave):
                  serial_operation_timeout: float = 1.25,
                  serial_read_terminator: bytes = b'\r\n',
                  serial_read_timeout: float = 0.5,
+                 serial_use_terminator: bool = False,
                  serial_write_timeout: float = 2,
-                 serial_use_terminator: bool = False):
+                 serial_bsmp: bool = False):
 
         super().__init__(redis_manager, client_id)
 
@@ -51,6 +52,7 @@ class SerialSlave(BaseSlave):
         self.serial_use_terminator = serial_use_terminator
         self.serial_read_timeout = serial_read_timeout
         self.serial_buffer = serial_buffer
+        self.serial_bsmp = serial_bsmp
         self.ser = None
 
     def start(self):
@@ -70,7 +72,7 @@ class SerialSlave(BaseSlave):
             timeout=self.serial_read_timeout,
             write_timeout=self.serial_write_timeout)
 
-    def data_handler(self, data: bytes):
+    def data_handler(self, data: bytes, settings={}):
         res = []
         if not self.ser:
             self.connect()
@@ -81,20 +83,34 @@ class SerialSlave(BaseSlave):
 
             ser_continue = True
 
+            operation_timeout = settings['ReplyTimeout']/1000 if 'ReplyTimeout' in settings else self.serial_operation_timeout
+            read_timeout = settings['ReadTimeout']/1000 if 'ReadTimeout' in settings else self.serial_read_timeout
+            max_input = settings['MaxInput'] if 'MaxInput' in settings else -1
+            terminator = list(settings['Terminator'].encode('utf-8')) if 'Terminator' in settings else self.serial_read_terminator
+            terminator_len = len(terminator)
+
+            self.ser.timeout = read_timeout
+
             tini = time.time()
             while ser_continue:
-                b = self.ser.read(self.serial_buffer)
+                b = self.ser.read(1)
+
                 if b == b'':
                     ser_continue = False
                     logger.debug('Ser: Read timeout')
-                if time.time() - tini > self.serial_operation_timeout:
+
+                if time.time() - tini > operation_timeout:
                     ser_continue = False
                     logger.debug('Ser: Operation timeout')
 
                 res.append(b)
 
-                if self.serial_use_terminator and len(res) >= len(self.serial_read_terminator):
-                    ser_continue = res[-self.serial_read_terminator_len:] == self.serial_read_terminator
+                if len(res) == max_input:
+                    ser_continue = False
+                    logger.debug('Ser: MaxInput')
+
+                if self.serial_use_terminator and len(res) >= len(terminator):
+                    ser_continue = res[-terminator_len:] == terminator
                     logger.debug('Ser: Terminator')
 
         except termios.error:

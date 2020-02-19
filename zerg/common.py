@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-import redis
+import ast
 import logging
+import redis
 import time
 import types
+
+COMM_TYPE = b'SERIAL'
 
 
 def log_config(level: int = logging.INFO):
@@ -33,41 +36,41 @@ def get_log_level(level: str):
 def get_terminator_bytes(terminator: str):
     """ Parse ascii symbolic to byte code. """
     return terminator \
-        .replace('\\NULL\\', '\x00')\
-        .replace('\\SOH\\',  '\x01')\
-        .replace('\\STX\\',  '\x02')\
-        .replace('\\ETX\\',  '\x03')\
-        .replace('\\EOT\\',  '\x04')\
-        .replace('\\ENQ\\',  '\x05')\
-        .replace('\\ACK\\',  '\x06')\
-        .replace('\\BEL\\',  '\x07')\
-        .replace('\\BS\\',   '\x08')\
-        .replace('\\TAB\\',  '\x09')\
-        .replace('\\HT\\',   '\x09')\
-        .replace('\\LF\\',   '\n') \
-        .replace('\\VT\\',   '\x0B')\
-        .replace('\\FF\\',   '\x0C')\
-        .replace('\\NP\\',   '\x0C')\
-        .replace('\\CR\\',   '\r') \
-        .replace('\\SO\\',   '\x0E')\
-        .replace('\\SI\\',   '\x0F')\
-        .replace('\\DLE\\',  '\x10')\
-        .replace('\\DC1\\',  '\x11')\
-        .replace('\\DC2\\',  '\x12')\
-        .replace('\\DC3\\',  '\x13')\
-        .replace('\\DC4\\',  '\x14')\
-        .replace('\\NAK\\',  '\x15')\
-        .replace('\\SYN\\',  '\x16')\
-        .replace('\\ETB\\',  '\x17')\
-        .replace('\\CAN\\',  '\x18')\
-        .replace('\\EM\\',   '\x19')\
-        .replace('\\SUB\\',  '\x1A')\
-        .replace('\\ESC\\',  '\x1B')\
-        .replace('\\FS\\',   '\x1C')\
-        .replace('\\GS\\',   '\x1D')\
-        .replace('\\RS\\',   '\x1E')\
-        .replace('\\US\\',   '\x1F')\
-        .replace('\\DEL\\',  '\x7F')\
+        .replace('\\NULL\\', '\x00') \
+        .replace('\\SOH\\', '\x01') \
+        .replace('\\STX\\', '\x02') \
+        .replace('\\ETX\\', '\x03') \
+        .replace('\\EOT\\', '\x04') \
+        .replace('\\ENQ\\', '\x05') \
+        .replace('\\ACK\\', '\x06') \
+        .replace('\\BEL\\', '\x07') \
+        .replace('\\BS\\', '\x08') \
+        .replace('\\TAB\\', '\x09') \
+        .replace('\\HT\\', '\x09') \
+        .replace('\\LF\\', '\n') \
+        .replace('\\VT\\', '\x0B') \
+        .replace('\\FF\\', '\x0C') \
+        .replace('\\NP\\', '\x0C') \
+        .replace('\\CR\\', '\r') \
+        .replace('\\SO\\', '\x0E') \
+        .replace('\\SI\\', '\x0F') \
+        .replace('\\DLE\\', '\x10') \
+        .replace('\\DC1\\', '\x11') \
+        .replace('\\DC2\\', '\x12') \
+        .replace('\\DC3\\', '\x13') \
+        .replace('\\DC4\\', '\x14') \
+        .replace('\\NAK\\', '\x15') \
+        .replace('\\SYN\\', '\x16') \
+        .replace('\\ETB\\', '\x17') \
+        .replace('\\CAN\\', '\x18') \
+        .replace('\\EM\\', '\x19') \
+        .replace('\\SUB\\', '\x1A') \
+        .replace('\\ESC\\', '\x1B') \
+        .replace('\\FS\\', '\x1C') \
+        .replace('\\GS\\', '\x1D') \
+        .replace('\\RS\\', '\x1E') \
+        .replace('\\US\\', '\x1F') \
+        .replace('\\DEL\\', '\x7F') \
         .encode('utf-8')
 
 
@@ -81,6 +84,9 @@ class RedisManager:
         self.downstream_data = stream_name + '#down#data'
         self.upstream_data = stream_name + '#up#data'
         self.upstream_listen = stream_name + '#up#listen'
+
+        # This is a redis hash containing special settings for comm
+        self.device_comm_settings = stream_name + '#device#comm#settings'
 
         self._downstream_action = None
         self._pipeline = self.connection.pipeline(transaction=True)
@@ -115,9 +121,13 @@ class RedisManager:
             self.connection.close()
             logger.info('Redis connection closed.')
 
-    def master_sync_send_receive(self, data):
+    def master_sync_send_receive(self, data, settings: bytes = b'{}'):
+        """
+        :@param settings: String encoded dictionary that will populate the settings key
+        :@param data: Payload
+        """
         try:
-            self.master_downstream_handler(data)
+            self.master_downstream_handler(data, settings)
             self.master_pool_data()
             return self.master_upstream_handler()
         except redis.exceptions.ConnectionError:
@@ -136,13 +146,14 @@ class RedisManager:
         self._pipeline.get(self.upstream_data)
         return self._pipeline.execute()[2]
 
-    def master_downstream_handler(self, data: bytes):
+    def master_downstream_handler(self, data: bytes, settings: bytes = b'{}'):
         # Send stuff to redis
         self._upstream_listen_code = time.time()
         self._pipeline.delete(self.upstream_data)  # Remove old repose
         self._pipeline.set(self.upstream_listen, self._upstream_listen_code)  # Update listen code
         self._pipeline.set(self.downstream_data, data)  # Set downstream data
         self._pipeline.publish(self.upstream_listen, self._upstream_listen_code)  # Publish listen code
+        self._pipeline.set(self.device_comm_settings, settings)  # Send device settings
         self._pipeline.execute()
         logger.debug('{}: {}\t{}: {}'.format(
             self.downstream_data, data,
@@ -170,21 +181,30 @@ class RedisManager:
     def slave_downstream_handler(self, _message_id):
 
         message_id = _message_id['data']
-        downstream_data = self.connection.eval('''
+        self._pipeline.eval('''
             -- KEYS[1] self.redis_upstream_listen
             -- KEYS[2] self.redis_downstream_data
             -- KEYS[3] self.message_id
-
+            
             if redis.call('exists', KEYS[2]) == 0 then
-                return nil
+               return nil
             end
 
+            -- If there's no response from downstream and this request is still valid
             if redis.call('get',  KEYS[1]) == KEYS[3] then
                 return redis.call('get', KEYS[2])
             end
 
             return nil
-            ''', 3, self.upstream_listen, self.downstream_data, message_id)
+            ''', 4, self.upstream_listen, self.downstream_data, message_id, self.device_comm_settings)
+        self._pipeline.get(self.device_comm_settings)
+        response = self._pipeline.execute()
+        downstream_data = response[0]
+        try:
+            settings = ast.literal_eval(response[1].decode('utf-8'))
+        except:
+            settings = {}
+            logger.debug("Impossible to parse {}.".format(response[1]))
 
         if not downstream_data:
             logger.info('Timeout {}: {}'.format(self.upstream_listen, message_id))
@@ -192,7 +212,7 @@ class RedisManager:
 
         logger.debug('{}: {}'.format(self.downstream_data, downstream_data))
 
-        os_data = self._downstream_action(downstream_data)
+        os_data = self._downstream_action(downstream_data, settings)
 
         if os_data:
             res = self.connection.eval(

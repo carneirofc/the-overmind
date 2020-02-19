@@ -25,9 +25,13 @@ class BaseMaster:
 
     def start(self):
         while True:
+            settings = b'{}'
             data = self.get_from_device()
+            if data.startswith(b'CFG|') and data.endswith(b'|GFC'):
+                settings = data.split(b'|')[1]
+                data = self.get_from_device()
 
-            upstream_response = self.redis_manager.master_sync_send_receive(data)
+            upstream_response = self.redis_manager.master_sync_send_receive(data, settings=settings)
 
             self.send_to_device(upstream_response)
 
@@ -124,4 +128,3 @@ class STREAMSocketMaster(BaseMaster):
                         super().start()
                 except:
                     logger.exception('The connection with the unix socket {} has been closed.'.format(self.socket_path))
-
