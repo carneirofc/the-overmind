@@ -13,6 +13,9 @@ include $(TOP)/configure/CONFIG
 DB += echo.db
 DB += echo.proto
 
+DB += uhv.db
+DB += uhv.proto
+
 #----------------------------------------------------
 # If <anyname>.db template is not named <anyname>*.template add
 # <anyname>_template = <templatename>

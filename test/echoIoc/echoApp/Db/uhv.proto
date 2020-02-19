@@ -1,0 +1,24 @@
+Terminator = CR LF;
+LockTimeout  = 85000;
+ReplyTimeout = 950;
+ReadTimeout  = 850;
+
+READ  = 0x30;
+WRITE = 0x31;
+
+CRC = "%01<xor>";
+
+# Channel pressure reading
+pressureMon {
+    MaxInput = 19;
+
+    # Settings
+    out "CFG|{\"MaxInput\":\$MaxInput, \"ReplyTimeout\":\$ReplyTimeout, \"ReadTimeout\":\$ReadTimeout, \"Terminator\":\"\\r\\n\"}|GFC" ;
+
+    # Payload
+    out STX, $1, "8\$22", $READ, ETX, $CRC;
+
+    # Response
+    in  STX, "\?", "8\$22", $READ, "%10g", ETX, $CRC;
+    wait 15;
+}
