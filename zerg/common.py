@@ -224,16 +224,19 @@ class RedisManager:
 
                 local valid_id = redis.call('get', KEYS[3]) == KEYS[4]
 
+                -- If the message is deprecated exit
                 if not valid_id then
                    return -1
                 end
-
+                
+                -- If there is another answer exit
                 if redis.call('exists', KEYS[1]) == 1 then
                     return -2
                 end
 
-               redis.call('set', KEYS[1], KEYS[2])
-               return 1
+                -- Answer the request
+                redis.call('set', KEYS[1], KEYS[2])
+                return 1
                 ''', 4, self.upstream_data, os_data, self.upstream_listen, message_id)
 
             logger.debug('{}: {} action_status={}'.format(self.upstream_data, os_data, res))
