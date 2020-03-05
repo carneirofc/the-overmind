@@ -26,10 +26,10 @@ setup(
     install_requires=_requirements,
     packages=find_namespace_packages(include=['zerg']),
     scripts=[
-        # 'scripts/zerg-master-basic.py',
         'scripts/zerg-master-socket-stream.py',
         'scripts/zerg-slave-basic.py',
         'scripts/zerg-slave-serial.py',
+        'scripts/zerg-slave-serial-stream.py',
     ],
     include_package_data=True,
     zip_safe=False
