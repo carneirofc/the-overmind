@@ -1,2 +1,4 @@
 pyserial
 redis==3.3.11
+requests
+netifaces
