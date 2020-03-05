@@ -107,9 +107,10 @@ def get_valid_ips():
                 for net in VALID_NETWORKS:
                     if ipv4 in net:
                         ips.append(str(ipv4))
+                        logger.info('Valid interface {}'.format(v))
                         break
             except:
-                logger.info('Invalid interface {}'.format(v))
+                logger.warning('Invalid interface {}'.format(v))
     return ips
 
 
