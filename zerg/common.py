@@ -235,14 +235,14 @@ class RedisManager:
                
                 -- If not nil, check if I'm the HIGH priority. If so, set the status
                 if KEYS[2] == KEYS[3] then
-                    redis.call('setex', KEYS[1], KEYS[2], KEYS[5])
+                    redis.call('setex', KEYS[1], tonumber(KEYS[5]), KEYS[2])
                     return 0
                 end
                 
                 -- LOW priority only set if the slave is nil
                 return -1
                 
-            ''', 6, self.slave_status, self.slave_priority, HIGH, LOW, EXPIRE_TIMER)
+            ''', 5, self.slave_status, self.slave_priority, HIGH, LOW, EXPIRE_TIMER)
 
     @staticmethod
     def init_pool(ip: str = 'localhost', port: int = 6379, db: int = 0):
@@ -348,7 +348,7 @@ class RedisManager:
             end
 
             return nil
-            ''', 7, self.upstream_listen, self.downstream_data, message_id, self.device_comm_settings,
+            ''', 5, self.upstream_listen, self.downstream_data, message_id,
                             self.slave_status, self.slave_priority)
         self._pipeline.get(self.device_comm_settings)
         response = self._pipeline.execute()
