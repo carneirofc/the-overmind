@@ -11,9 +11,7 @@ logger = logging.getLogger()
 
 
 class BaseSlave:
-    """
-    Base slave object for synchronous communication.
-    """
+    """ Base slave object for synchronous communication. """
 
     def __init__(self, redis_manager: zerg.common.RedisManager, client_id: str, priority: str = 'high'):
         self.client_id = client_id
@@ -40,7 +38,6 @@ class SerialSlave(BaseSlave):
                  serial_operation_timeout: float = 1.25,
                  serial_read_terminator: bytes = b'\r\n',
                  serial_read_timeout: float = 0.5,
-                 serial_use_terminator: bool = False,
                  serial_write_timeout: float = 2):
 
         super().__init__(redis_manager, client_id, priority)
@@ -49,9 +46,9 @@ class SerialSlave(BaseSlave):
         self.serial_baudrate = serial_baudrate
         self.serial_device = serial_device
         self.serial_operation_timeout = serial_operation_timeout
-        self.serial_read_terminator = list(serial_read_terminator)
-        self.serial_read_terminator_len = len(self.serial_read_terminator)
-        self.serial_use_terminator = serial_use_terminator
+        if serial_read_terminator:
+            self.serial_read_terminator = list(serial_read_terminator)
+            self.serial_read_terminator_len = len(self.serial_read_terminator)
         self.serial_read_timeout = serial_read_timeout
         self.serial_buffer = serial_buffer
         self.ser = None
@@ -88,9 +85,11 @@ class SerialSlave(BaseSlave):
                                     'ReplyTimeout'] / 1000 if 'ReplyTimeout' in settings else self.serial_operation_timeout
             read_timeout = settings['ReadTimeout'] / 1000 if 'ReadTimeout' in settings else self.serial_read_timeout
             max_input = settings['MaxInput'] if 'MaxInput' in settings else -1
-            terminator = list(
-                settings['Terminator'].encode('utf-8')) if 'Terminator' in settings else self.serial_read_terminator
-            terminator_len = len(terminator)
+
+            serial_use_terminator = 'Terminator' in settings or self.serial_read_terminator
+            if serial_use_terminator:
+                terminator = list(settings['Terminator'].encode('utf-8')) if 'Terminator' in settings else self.serial_read_terminator
+                terminator_len = len(terminator)
 
             self.ser.timeout = read_timeout
 
@@ -112,7 +111,7 @@ class SerialSlave(BaseSlave):
                     ser_continue = False
                     logger.debug('Ser: MaxInput')
 
-                if self.serial_use_terminator and len(res) >= len(terminator):
+                if serial_use_terminator and len(res) >= len(terminator):
                     ser_continue = res[-terminator_len:] == terminator
                     logger.debug('Ser: Terminator')
 

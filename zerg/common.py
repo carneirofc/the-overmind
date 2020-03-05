@@ -132,6 +132,8 @@ def get_log_level(level: str):
 
 def get_terminator_bytes(terminator: str):
     """ Parse ascii symbolic to byte code. """
+    if not terminator:
+        return None
     return terminator \
         .replace('\\NULL\\', '\x00') \
         .replace('\\SOH\\', '\x01') \
