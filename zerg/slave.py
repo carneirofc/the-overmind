@@ -36,7 +36,7 @@ class SerialSlave(BaseSlave):
                  serial_baudrate: int,
                  serial_buffer: int = 256,
                  serial_operation_timeout: float = 1.25,
-                 serial_read_terminator: bytes = b'\r\n',
+                 serial_read_terminator=None,
                  serial_read_timeout: float = 0.5,
                  serial_write_timeout: float = 2):
 
@@ -49,6 +49,8 @@ class SerialSlave(BaseSlave):
         if serial_read_terminator:
             self.serial_read_terminator = list(serial_read_terminator)
             self.serial_read_terminator_len = len(self.serial_read_terminator)
+        else:
+            self.serial_read_terminator = None
         self.serial_read_timeout = serial_read_timeout
         self.serial_buffer = serial_buffer
         self.ser = None
@@ -86,7 +88,7 @@ class SerialSlave(BaseSlave):
             read_timeout = settings['ReadTimeout'] / 1000 if 'ReadTimeout' in settings else self.serial_read_timeout
             max_input = settings['MaxInput'] if 'MaxInput' in settings else -1
 
-            serial_use_terminator = 'Terminator' in settings or self.serial_read_terminator
+            serial_use_terminator = ('Terminator' in settings) or (self.serial_read_terminator is not None)
             if serial_use_terminator:
                 terminator = list(settings['Terminator'].encode('utf-8')) if 'Terminator' in settings else self.serial_read_terminator
                 terminator_len = len(terminator)

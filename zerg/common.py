@@ -229,19 +229,18 @@ class RedisManager:
                 local slaveStatus = redis.call('get', KEYS[1])
                 
                 -- If is nil the slave this client assumes no matter what
-                if slaveStatus == nil then
-                    redis.call('set', KEYS[1], KEYS[2])
-                    return 0
-                end
-               
-                -- If not nil, check if I'm the HIGH priority. If so, set the status
-                if KEYS[2] == KEYS[3] then
+                if (slaveStatus == false) then
                     redis.call('setex', KEYS[1], tonumber(KEYS[5]), KEYS[2])
                     return 0
                 end
-                
-                -- LOW priority only set if the slave is nil
-                return -1
+
+                if (( KEYS[2] == KEYS[4] and slaveStatus == KEYS[4] ) or ( KEYS[2] == KEYS[3] )) then
+                    redis.call('setex', KEYS[1], tonumber(KEYS[5]), KEYS[2])
+                    return 0
+                end
+
+                -- Nothing to do ...
+                return -2
                 
             ''', 5, self.slave_status, self.slave_priority, HIGH, LOW, EXPIRE_TIMER)
 
@@ -339,7 +338,7 @@ class RedisManager:
             local status = redis.call('get', KEYS[4])
             
             -- If the current status is not my priority, abort !
-            if status != KEYS[5] then
+            if status ~= KEYS[5] then
                 return nil
             end
             
