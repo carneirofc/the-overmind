@@ -13,7 +13,7 @@
             "device": "/dev/ttyUSB0",
             "operation_timeout": 1.2,
             "read_terminator": null,
-            "read_timeout": 0.2,
+            "read_timeout": 0.850,
             "write_timeout": 1
         },
         "redis":{
