@@ -101,11 +101,11 @@ class SerialSlave(BaseSlave):
 
                 if b == b'':
                     ser_continue = False
-                    logger.debug('Ser: Read timeout')
+                    logger.warning('Ser: Read timeout')
 
                 if time.time() - tini > operation_timeout:
                     ser_continue = False
-                    logger.debug('Ser: Operation timeout')
+                    logger.warning('Ser: Operation timeout')
 
                 res.append(b)
 

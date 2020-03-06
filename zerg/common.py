@@ -10,17 +10,19 @@ import ipaddress
 import threading
 
 COMM_TYPE = b'SERIAL'
-HOSTS = [
-    '10.0.38.42', '10.0.38.46', '10.0.38.59',
-    '10.128.255.5', '10.128.255.4', '10.128.255.3'
-]
-LOCATION = '/download/cons-config'
+HOSTS = ['10.0.6.61']
+# HOSTS = [
+#     '10.0.38.42', '10.0.38.46', '10.0.38.59',
+#     '10.128.255.5', '10.128.255.4', '10.128.255.3'
+# ]
+LOCATION = '/cons-config'
 BEAGLE = '/beagle.json'
+MASTER = '/master.json'
 APPLICATION = '/app.json'
 
 HIGH = 'high'
 LOW = 'low'
-EXPIRE_TIMER = 2
+EXPIRE_TIMER = 1
 
 VALID_NETWORKS = [
     ipaddress.IPv4Network('10.128.0.0/16'),
@@ -45,6 +47,17 @@ class BeagleConfig:
         self.endpoint = config['endpoint']
 
 
+class StreamConfig:
+    def __init__(self, config, application):
+        self.application = application
+        self.reconnect_interval = config['reconnect_interval']
+        self.buffer = config['buffer']
+        self.timeout = config['timeout']
+        self.trim_terminator = config['trim_terminator']
+        self.terminator = config['terminator']
+        self.read_payload_length = config['read_payload_length']
+
+
 def get_device_settings():
     url = None
     for host in HOSTS:
@@ -67,6 +80,23 @@ def get_config_settings():
             logger.warning('Unable to get response from {}'.format(url))
 
     return None
+
+
+def get_master_settings():
+    url = None
+    for host in HOSTS:
+        try:
+            url = 'http://{}{}{}'.format(host, LOCATION, MASTER)
+            return requests.get(url=url, verify=False).json()
+        except requests.exceptions.ConnectionError:
+            logger.warning('Unable to get response from {}'.format(url))
+
+    return None
+
+
+def get_master_data(type: str, endpoint: str):
+    data = get_master_settings()
+    return data[type][endpoint]
 
 
 def get_interfaces_data():
@@ -177,7 +207,8 @@ def get_terminator_bytes(terminator: str):
 class RedisManager:
     _pool = None
 
-    def __init__(self, stream_name, ip='localhost', port=6379, db=0, tick: float = 0.001, upstream_timeout: float = 1, reconnect_interval: float = 30,
+    def __init__(self, stream_name, ip='localhost', port=6379, db=0, tick: float = 0.001, upstream_timeout: float = 1,
+                 reconnect_interval: float = 30,
                  slave_priority: str = HIGH):
 
         RedisManager.init_pool(ip, port, db)
@@ -216,7 +247,7 @@ class RedisManager:
         """ Refresh slave status """
         worker_connection = redis.Redis(connection_pool=RedisManager._pool)
         while True:
-            time.sleep(1)
+            time.sleep(0.5)
             worker_connection.eval('''
                 -- KEYS[1] self.slave_status
                 -- KEYS[2] self.slave_priority

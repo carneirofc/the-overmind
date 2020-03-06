@@ -42,10 +42,9 @@ class STREAMSocketMaster(BaseMaster):
     def __init__(self, socket_path,
                  redis_manager: zerg.common.RedisManager,
                  socket_reconnect_interval: int = 30,
-                 socket_terminator: bytes = b'\n',
+                 socket_terminator: bytes = None,
                  socket_buffer: int = 1,
                  socket_timeout: int = 5,
-                 socket_use_terminator: bool = True,
                  socket_read_payload_length: bool = False,
                  socket_trim_terminator: bool = True
                  ):
@@ -56,7 +55,6 @@ class STREAMSocketMaster(BaseMaster):
         :param socket_terminator:
         :param socket_buffer:
         :param socket_timeout:
-        :param socket_use_terminator:
         :param socket_read_payload_length: If enabled, the first 4 bytes are the remaining payload length.
         """
         super().__init__(redis_manager)
@@ -68,7 +66,6 @@ class STREAMSocketMaster(BaseMaster):
         self.socket_terminator = socket_terminator
         self.socket_timeout = socket_timeout
         self.socket_trim_terminator = socket_trim_terminator
-        self.socket_use_terminator = socket_use_terminator
 
     def send_to_device(self, upstream_response):
         if upstream_response is None:
@@ -98,7 +95,7 @@ class STREAMSocketMaster(BaseMaster):
                     if b == b'':
                         break
                     data += b
-                    if self.socket_use_terminator and data.endswith(self.socket_terminator):
+                    if self.socket_terminator and data.endswith(self.socket_terminator):
                         if self.socket_trim_terminator:
                             data = data[:-len(self.socket_terminator)]
                         socket_continue_recv = False
