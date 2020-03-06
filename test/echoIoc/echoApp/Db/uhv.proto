@@ -1,7 +1,7 @@
 Terminator = CR LF;
 LockTimeout  = 85000;
-ReplyTimeout = 950;
-ReadTimeout  = 850;
+ReplyTimeout = 2000;
+ReadTimeout  = 100;
 
 READ  = 0x30;
 WRITE = 0x31;
@@ -13,7 +13,7 @@ pressureMon {
     MaxInput = 19;
 
     # Settings
-    out "CFG|{\"MaxInput\":\$MaxInput, \"ReplyTimeout\":\$ReplyTimeout, \"ReadTimeout\":\$ReadTimeout, \"Terminator\":\"\\r\\n\"}|GFC" ;
+    out "CFG|{\"MaxInput\":\$MaxInput, \"ReplyTimeout\":\$ReplyTimeout, \"ReadTimeout\":\$ReadTimeout}|GFC" ;
 
     # Payload
     out STX, $1, "8\$22", $READ, ETX, $CRC;
@@ -21,4 +21,25 @@ pressureMon {
     # Response
     in  STX, "\?", "8\$22", $READ, "%10g", ETX, $CRC;
     wait 15;
+}
+
+# Channel voltage reading on/off
+getHVOnOff {
+    MaxInput = 10;
+
+    # Settings
+    out "CFG|{\"MaxInput\":\$MaxInput, \"ReplyTimeout\":\$ReplyTimeout, \"ReadTimeout\":\$ReadTimeout}|GFC" ;
+
+    out STX, $1, 0x30, 0x31, "\$2", $READ, ETX, $CRC;
+    in  STX, "\?", "01\$2", $READ, "%i", ETX, $CRC;
+}
+
+setHVOnOff {
+    MaxInput = 6;
+
+    # Settings
+    out "CFG|{\"MaxInput\":\$MaxInput, \"ReplyTimeout\":\$ReplyTimeout, \"ReadTimeout\":\$ReadTimeout}|GFC" ;
+
+    out STX, $1, 0x30, 0x31, "\$2", $WRITE, "%i", ETX, $CRC;
+    in  STX, "\?", ACK, ETX, $CRC;
 }

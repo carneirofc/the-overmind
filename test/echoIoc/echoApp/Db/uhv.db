@@ -1,8 +1,28 @@
 # Pressure
-record(ai, "$(P):Pressure1-Mon") {
-    field(SCAN, "1 second")
+record(ai, "$(P):Pressure$(CH=1)-Mon") {
+    field(PRIO, "LOW")
+    field(SCAN, "10 second")
     field(DESC, "Measured pressure")
     field(DTYP, "stream")
     field(EGU,  "mBar")
-    field(INP,  "@uhv.proto pressureMon(128,1) $(PORT)")
+    field(INP,  "@uhv.proto pressureMon($(ADDR),$(CH=1)) $(PORT)")
+}
+record(bi, "$(P):HVState$(CH=1)-RB") {
+    field(PRIO, "HIGH")
+    field(DESC, "Channel HV on/off")
+    field(DTYP, "stream")
+    field(INP,  "@uhv.proto getHVOnOff($(ADDR),$(CH=1)) $(PORT)")
+    field(ZNAM, "OFF")
+    field(ONAM, "ON")
+    field(PINI, "YES")
+    field(PHAS, "0")
+}
+record(bo, "$(P):HVState$(CH=1)-SP") {
+    field(PRIO, "HIGH")
+    field(DESC, "Channel HV on/off")
+    field(DTYP, "stream")
+    field(OUT, "@uhv.proto setHVOnOff($(ADDR),$(CH=1)) $(PORT)")
+    field(ZNAM, "OFF")
+    field(ONAM, "ON")
+    field(FLNK, "$(P):HVState$(CH=1)-RB")
 }

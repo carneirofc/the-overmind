@@ -1,14 +1,4 @@
-write {
-    out "%s";
-}
+OutTerminator = CR LF;
 
-read {
-    in  "%s";
-}
+query { out "\$1"; in  "%s"; }
 
-Terminator = LF;
-
-query {
-    out "\$1";
-    in  "%s";
-}

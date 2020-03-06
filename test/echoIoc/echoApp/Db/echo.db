@@ -1,31 +1,30 @@
-record(stringout, "$(P):Write"){
+# Pressure
+record(ai, "$(P):Pressure-Mon") {
+    field(SCAN, "1 second")
+    field(DESC, "Measured pressure")
     field(DTYP, "stream")
-    field(OUT,  "@echo.proto write $(PORT) $(A)")
-}
-
-record(stringin, "$(P):Read"){
-    field(DTYP, "stream")
-    field(INP,  "@echo.proto read $(PORT) $(A)")
+    field(EGU,  "mBar")
+    field(INP,  "@echo.proto pressureMon(131,1) $(PORT)")
 }
 
 record(stringin, "$(P):Query1"){
     field(DTYP, "stream")
     field(INP,  "@echo.proto query(1) $(PORT) $(A)")
-    field(SCAN, "1 second")
+#    field(SCAN, "1 second")
 }
 record(stringin, "$(P):Query2"){
     field(DTYP, "stream")
     field(INP,  "@echo.proto query(2) $(PORT) $(A)")
-    field(SCAN, "1 second")
+#    field(SCAN, "1 second")
 }
 record(stringin, "$(P):Query3"){
     field(DTYP, "stream")
     field(INP,  "@echo.proto query(3) $(PORT) $(A)")
-    field(SCAN, "1 second")
+#    field(SCAN, "1 second")
 }
 record(stringin, "$(P):Query4"){
     field(DTYP, "stream")
     field(INP,  "@echo.proto query(4) $(PORT) $(A)")
-    field(SCAN, "1 second")
+#    field(SCAN, "1 second")
 }
 
