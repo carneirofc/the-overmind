@@ -96,26 +96,32 @@ class SerialSlave(BaseSlave):
             self.ser.timeout = read_timeout
 
             tini = time.time()
-            while ser_continue:
+
+            self.ser.flushInput()
+            self.ser.flushOutput()
+
+            while True:
                 b = self.ser.read(1)
 
                 if b == b'':
-                    ser_continue = False
-                    logger.warning('Ser: Read timeout')
+                    logger.warning('Ser: Read timeout {}s'.format(read_timeout))
+                    break
 
                 if time.time() - tini > operation_timeout:
-                    ser_continue = False
-                    logger.warning('Ser: Operation timeout')
+                    logger.warning('Ser: Operation timeout {}s'.format(operation_timeout))
+                    break
 
                 res.append(b)
 
                 if len(res) == max_input:
-                    ser_continue = False
-                    logger.debug('Ser: MaxInput')
+                    # ser_continue = False
+                    logger.debug('Ser: MaxInput {}'.format(max_input))
+                    break
 
                 if serial_use_terminator and len(res) >= len(terminator):
-                    ser_continue = res[-terminator_len:] == terminator
-                    logger.debug('Ser: Terminator')
+                    if res[-terminator_len:] == terminator:
+                        logger.debug('Ser: Terminator')
+                        break
 
         except termios.error:
             logger.exception('Serial exception, closing connection.')
