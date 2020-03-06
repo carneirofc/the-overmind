@@ -140,7 +140,7 @@ def get_valid_ips():
                         logger.info('Valid interface {}'.format(v))
                         break
             except:
-                logger.warning('Invalid interface {}'.format(v))
+                logger.debug('Invalid interface {}'.format(v))
     return ips
 
 
@@ -388,10 +388,10 @@ class RedisManager:
             settings = ast.literal_eval(response[1].decode('utf-8'))
         except:
             settings = {}
-            logger.debug("Impossible to parse {}.".format(response[1]))
+            logger.warning("Impossible to parse device_comm_settings {}.".format(response[1]))
 
         if not downstream_data:
-            logger.info('Timeout {}: {}'.format(self.upstream_listen, message_id))
+            logger.debug('Timeout {}: {}'.format(self.upstream_listen, message_id))
             return
 
         logger.debug('{}: {}'.format(self.downstream_data, downstream_data))
@@ -423,4 +423,4 @@ class RedisManager:
                 return 1
                 ''', 4, self.upstream_data, os_data, self.upstream_listen, message_id)
 
-            logger.debug('{}: {} action_status={}'.format(self.upstream_data, os_data, res))
+            logger.debug('{}: {} status={}'.format(self.upstream_data, os_data, res))

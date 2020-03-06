@@ -62,26 +62,25 @@ class SerialSlave(BaseSlave):
     def connect(self, retry=True):
         if retry:
             while not os.path.exists(self.serial_device):
-                logger.error('Serial device \'{}\' does not exists. Retry in 30s.'.format(self.serial_device))
+                logger.error('Serial device \'{}\' does not exist. Retry in 30s.'.format(self.serial_device))
                 time.sleep(30)
 
-        logger.info('Connecting to serial device.')
+        logger.info('Connecting to serial device...')
         self.ser = serial.Serial(
             self.serial_device,
             self.serial_baudrate,
             timeout=self.serial_read_timeout,
             write_timeout=self.serial_write_timeout)
+        logger.info('Connected at {}'.format(self.ser))
 
     def downstream_action(self, data: bytes, settings={}):
         res = []
         if not self.ser:
             self.connect()
         try:
-            self.ser.reset_input_buffer()
-            self.ser.reset_output_buffer()
+            self.ser.flushInput()
+            self.ser.flushOutput()
             self.ser.write(data)
-
-            ser_continue = True
 
             operation_timeout = settings[
                                     'ReplyTimeout'] / 1000 if 'ReplyTimeout' in settings else self.serial_operation_timeout
@@ -96,9 +95,6 @@ class SerialSlave(BaseSlave):
             self.ser.timeout = read_timeout
 
             tini = time.time()
-
-            self.ser.flushInput()
-            self.ser.flushOutput()
 
             while True:
                 b = self.ser.read(1)
@@ -115,12 +111,12 @@ class SerialSlave(BaseSlave):
 
                 if len(res) == max_input:
                     # ser_continue = False
-                    logger.debug('Ser: MaxInput {}'.format(max_input))
+                    logger.info('Ser: MaxInput {}'.format(max_input))
                     break
 
                 if serial_use_terminator and len(res) >= len(terminator):
                     if res[-terminator_len:] == terminator:
-                        logger.debug('Ser: Terminator')
+                        logger.warning('Ser: Terminator')
                         break
 
         except termios.error:
