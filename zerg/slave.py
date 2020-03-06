@@ -111,12 +111,12 @@ class SerialSlave(BaseSlave):
 
                 if len(res) == max_input:
                     # ser_continue = False
-                    logger.info('Ser: MaxInput {}'.format(max_input))
+                    logger.debug('Ser: MaxInput {}'.format(max_input))
                     break
 
                 if serial_use_terminator and len(res) >= len(terminator):
                     if res[-terminator_len:] == terminator:
-                        logger.warning('Ser: Terminator')
+                        logger.debug('Ser: Terminator')
                         break
 
         except termios.error:
