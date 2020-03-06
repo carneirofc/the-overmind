@@ -31,7 +31,8 @@ if __name__ == '__main__':
                            serial_buffer=app_config['serial']['buffer'],
                            serial_device=app_config['serial']['device'],
                            serial_operation_timeout=app_config['serial']['operation_timeout'],
-                           serial_read_terminator=zerg.common.get_terminator_bytes(app_config['serial']['read_terminator']),
+                           serial_read_terminator=
+                                zerg.common.get_terminator_bytes(app_config['serial']['read_terminator']),
                            serial_read_timeout=app_config['serial']['read_timeout'],
                            serial_write_timeout=app_config['serial']['write_timeout'],
                            ).start()
