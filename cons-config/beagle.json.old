@@ -1,0 +1,17 @@
+{
+    "10.0.38.27":{
+        "app": "uhv",
+        "priority": "high",
+        "endpoint": "uhv:test"
+    },
+    "10.128.124.183": {
+        "app": "uhv",
+        "priority": "low",
+        "endpoint": "uhv:test"
+    },
+    "10.0.6.61":{
+        "app": "test",
+        "priority": "high",
+        "endpoint": "app:test"
+    }
+}

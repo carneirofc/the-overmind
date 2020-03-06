@@ -1,0 +1,34 @@
+{
+    "the-overmind":{
+        "db": 0,
+        "port": 6379,
+        "ip": "10.0.6.61",
+        "timeout_identifier": "TOUT",
+        "reconnect_interval": 30
+    },
+    "uhv":{
+        "serial":{
+            "baudrate": 38400,
+            "buffer": 1,
+            "device": "/dev/ttyUSB0",
+            "operation_timeout": 1.2,
+            "read_terminator": null,
+            "read_timeout": 0.2,
+            "write_timeout": 1
+        },
+        "redis":{
+            "upstream_timeout": 1.6
+        },
+        "stream":{
+            "reconnect_interval": 30,
+            "buffer": 1,
+            "timeout": 5,
+            "trim_terminator": true,
+            "terminator": "\\CR\\\\LF\\",
+            "read_payload_length": false
+        }
+    },
+    "mks":{
+        "baudrate": 115200
+    }
+}
